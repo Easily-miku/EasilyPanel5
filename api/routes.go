@@ -65,8 +65,6 @@ func SetupRoutes(authHandlers AuthHandlers) http.Handler {
 	mux.HandleFunc("/api/frp/tunnels/", handleFRPTunnelAction)
 
 	// 实例管理增强
-	mux.HandleFunc("/api/templates", handleTemplates)
-	mux.HandleFunc("/api/templates/", handleTemplateAction)
 	mux.HandleFunc("/api/groups", handleGroups)
 	mux.HandleFunc("/api/groups/", handleGroupAction)
 	mux.HandleFunc("/api/batch", handleBatchOperations)
@@ -84,6 +82,9 @@ func SetupRoutes(authHandlers AuthHandlers) http.Handler {
 
 	// 系统设置
 	mux.HandleFunc("/api/settings", handleSettings)
+
+	// 系统日志
+	mux.HandleFunc("/api/logs/system", handleSystemLogs)
 
 	// WebSocket
 	mux.HandleFunc("/ws", ServeWS)

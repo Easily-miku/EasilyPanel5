@@ -8,6 +8,8 @@ import (
 	"runtime/debug"
 	"strings"
 	"time"
+
+	"easilypanel5/utils"
 )
 
 // StandardResponse 标准响应结构
@@ -65,13 +67,18 @@ func LoggingMiddleware(next http.Handler) http.Handler {
 
 		// 记录请求日志
 		duration := time.Since(start)
-		log.Printf("[%s] %s %s - %d - %v",
-			r.Method,
-			r.RequestURI,
-			r.RemoteAddr,
-			recorder.statusCode,
-			duration,
-		)
+
+		// 使用新的日志系统
+		logger := utils.GetLogger()
+
+		// 根据状态码选择日志级别
+		if recorder.statusCode >= 500 {
+			logger.Error("[%s] %s %s - %d - %v", r.Method, r.RequestURI, r.RemoteAddr, recorder.statusCode, duration)
+		} else if recorder.statusCode >= 400 {
+			logger.Warn("[%s] %s %s - %d - %v", r.Method, r.RequestURI, r.RemoteAddr, recorder.statusCode, duration)
+		} else {
+			logger.Info("[%s] %s %s - %d - %v", r.Method, r.RequestURI, r.RemoteAddr, recorder.statusCode, duration)
+		}
 	})
 }
 

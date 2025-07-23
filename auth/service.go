@@ -367,13 +367,21 @@ func (s *AuthService) Login(req *LoginRequest, ipAddress, userAgent string) (*Lo
 
 		// 验证TOTP或备用码
 		if req.TOTPCode != "" {
-			if !s.totpManager.ValidateCode(user.TwoFactorSecret, req.TOTPCode) {
+			valid, newTimeStep := s.totpManager.ValidateCodeWithReplayProtection(
+				user.TwoFactorSecret,
+				req.TOTPCode,
+				user.LastTOTPTimeStep,
+				2, // 2分钟容错窗口
+			)
+			if !valid {
 				s.logSecurityEvent(user.ID, ActionLoginFailed, ipAddress, userAgent, "Invalid TOTP code")
 				return &LoginResponse{
 					Success: false,
 					Message: "Invalid verification code",
 				}, nil
 			}
+			// 更新最后使用的时间步
+			user.LastTOTPTimeStep = newTimeStep
 		} else if req.BackupCode != "" {
 			valid, newCodes := s.backupManager.ValidateBackupCode(req.BackupCode, user.BackupCodes)
 			if !valid {
@@ -656,9 +664,17 @@ func (s *AuthService) ChangePassword(userID string, req *ChangePasswordRequest) 
 
 	// 如果启用了2FA，验证TOTP码
 	if user.TwoFactorEnabled && req.TOTPCode != "" {
-		if !s.totpManager.ValidateCode(user.TwoFactorSecret, req.TOTPCode) {
+		valid, newTimeStep := s.totpManager.ValidateCodeWithReplayProtection(
+			user.TwoFactorSecret,
+			req.TOTPCode,
+			user.LastTOTPTimeStep,
+			2, // 2分钟容错窗口
+		)
+		if !valid {
 			return &AuthError{Code: ErrInvalidTOTP, Message: "Invalid verification code"}
 		}
+		// 更新最后使用的时间步
+		user.LastTOTPTimeStep = newTimeStep
 	}
 
 	// 验证新密码强度

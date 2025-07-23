@@ -296,9 +296,14 @@ class MonitoringPageManager {
             if (response.ok && result.success) {
                 const chartsData = result.data || [];
                 this.updateCharts(chartsData);
+            } else {
+                // 如果历史数据API不存在，使用当前系统数据
+                this.updateCharts({});
             }
         } catch (error) {
             console.error('Failed to load charts data:', error);
+            // 使用当前系统数据作为后备
+            this.updateCharts({});
         }
     }
     
@@ -306,7 +311,14 @@ class MonitoringPageManager {
     renderSystemStats() {
         const systemOverview = document.getElementById('systemOverview');
         if (!systemOverview || !this.systemStats) return;
-        
+
+        // 计算使用率
+        const cpuUsage = this.systemStats.cpu?.usage || 0;
+        const memoryUsage = this.systemStats.memory ?
+            (this.systemStats.memory.used / this.systemStats.memory.total * 100) : 0;
+        const diskUsage = this.systemStats.disk ?
+            (this.systemStats.disk.used / this.systemStats.disk.total * 100) : 0;
+
         systemOverview.innerHTML = `
             <div class="stat-card cpu">
                 <div class="stat-icon">
@@ -314,78 +326,78 @@ class MonitoringPageManager {
                 </div>
                 <div class="stat-content">
                     <div class="stat-label">CPU使用率</div>
-                    <div class="stat-value">${this.systemStats.cpu_usage.toFixed(1)}%</div>
-                    <div class="stat-detail">${this.systemStats.cpu_cores} 核心</div>
+                    <div class="stat-value">${cpuUsage.toFixed(1)}%</div>
+                    <div class="stat-detail">${this.systemStats.cpu?.cores || 0} 核心</div>
                 </div>
                 <div class="stat-progress">
                     <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${this.systemStats.cpu_usage}%"></div>
+                        <div class="progress-fill" style="width: ${cpuUsage}%"></div>
                     </div>
                 </div>
             </div>
-            
+
             <div class="stat-card memory">
                 <div class="stat-icon">
                     <i class="mdi mdi-memory"></i>
                 </div>
                 <div class="stat-content">
                     <div class="stat-label">内存使用率</div>
-                    <div class="stat-value">${this.systemStats.memory_usage.toFixed(1)}%</div>
-                    <div class="stat-detail">${this.formatBytes(this.systemStats.memory_used)} / ${this.formatBytes(this.systemStats.memory_total)}</div>
+                    <div class="stat-value">${memoryUsage.toFixed(1)}%</div>
+                    <div class="stat-detail">${this.formatBytes(this.systemStats.memory?.used || 0)} / ${this.formatBytes(this.systemStats.memory?.total || 0)}</div>
                 </div>
                 <div class="stat-progress">
                     <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${this.systemStats.memory_usage}%"></div>
+                        <div class="progress-fill" style="width: ${memoryUsage}%"></div>
                     </div>
                 </div>
             </div>
-            
+
             <div class="stat-card disk">
                 <div class="stat-icon">
                     <i class="mdi mdi-harddisk"></i>
                 </div>
                 <div class="stat-content">
                     <div class="stat-label">磁盘使用率</div>
-                    <div class="stat-value">${this.systemStats.disk_usage.toFixed(1)}%</div>
-                    <div class="stat-detail">${this.formatBytes(this.systemStats.disk_used)} / ${this.formatBytes(this.systemStats.disk_total)}</div>
+                    <div class="stat-value">${diskUsage.toFixed(1)}%</div>
+                    <div class="stat-detail">${this.formatBytes(this.systemStats.disk?.used || 0)} / ${this.formatBytes(this.systemStats.disk?.total || 0)}</div>
                 </div>
                 <div class="stat-progress">
                     <div class="progress-bar">
-                        <div class="progress-fill" style="width: ${this.systemStats.disk_usage}%"></div>
+                        <div class="progress-fill" style="width: ${diskUsage}%"></div>
                     </div>
                 </div>
             </div>
-            
+
             <div class="stat-card network">
                 <div class="stat-icon">
                     <i class="mdi mdi-network"></i>
                 </div>
                 <div class="stat-content">
                     <div class="stat-label">网络流量</div>
-                    <div class="stat-value">${this.formatBytes(this.systemStats.network_rx + this.systemStats.network_tx)}/s</div>
-                    <div class="stat-detail">↓ ${this.formatBytes(this.systemStats.network_rx)}/s ↑ ${this.formatBytes(this.systemStats.network_tx)}/s</div>
+                    <div class="stat-value">${this.formatBytes((this.systemStats.network?.bytes_recv || 0) + (this.systemStats.network?.bytes_sent || 0))}</div>
+                    <div class="stat-detail">↓ ${this.formatBytes(this.systemStats.network?.bytes_recv || 0)} ↑ ${this.formatBytes(this.systemStats.network?.bytes_sent || 0)}</div>
                 </div>
             </div>
-            
+
             <div class="stat-card uptime">
                 <div class="stat-icon">
                     <i class="mdi mdi-clock"></i>
                 </div>
                 <div class="stat-content">
                     <div class="stat-label">系统运行时间</div>
-                    <div class="stat-value">${this.formatUptime(this.systemStats.uptime)}</div>
-                    <div class="stat-detail">负载: ${this.systemStats.load_average.join(', ')}</div>
+                    <div class="stat-value">${this.formatUptime(this.systemStats.uptime || 0)}</div>
+                    <div class="stat-detail">CPU核心: ${this.systemStats.cpu?.cores || 0}</div>
                 </div>
             </div>
-            
+
             <div class="stat-card processes">
                 <div class="stat-icon">
                     <i class="mdi mdi-application"></i>
                 </div>
                 <div class="stat-content">
-                    <div class="stat-label">进程数</div>
-                    <div class="stat-value">${this.systemStats.processes_total}</div>
-                    <div class="stat-detail">运行: ${this.systemStats.processes_running} 休眠: ${this.systemStats.processes_sleeping}</div>
+                    <div class="stat-label">服务器状态</div>
+                    <div class="stat-value">${this.serverStats.size}</div>
+                    <div class="stat-detail">运行中的服务器数量</div>
                 </div>
             </div>
         `;
@@ -456,22 +468,96 @@ class MonitoringPageManager {
     
     // 更新图表
     updateCharts(chartsData) {
-        // 更新当前值显示
-        if (chartsData.current) {
+        // 如果有系统统计数据，使用它来更新图表值
+        if (this.systemStats) {
+            const cpuUsage = this.systemStats.cpu?.usage || 0;
+            const memoryUsage = this.systemStats.memory ?
+                (this.systemStats.memory.used / this.systemStats.memory.total * 100) : 0;
+            const diskUsage = this.systemStats.disk ?
+                (this.systemStats.disk.used / this.systemStats.disk.total * 100) : 0;
+            const networkTotal = (this.systemStats.network?.bytes_recv || 0) + (this.systemStats.network?.bytes_sent || 0);
+
             const cpuValue = document.getElementById('cpuValue');
             const memoryValue = document.getElementById('memoryValue');
             const diskValue = document.getElementById('diskValue');
             const networkValue = document.getElementById('networkValue');
-            
-            if (cpuValue) cpuValue.textContent = `${chartsData.current.cpu.toFixed(1)}%`;
-            if (memoryValue) memoryValue.textContent = `${chartsData.current.memory.toFixed(1)}%`;
-            if (diskValue) diskValue.textContent = `${chartsData.current.disk.toFixed(1)}%`;
-            if (networkValue) networkValue.textContent = `${this.formatBytes(chartsData.current.network)}/s`;
+
+            if (cpuValue) cpuValue.textContent = `${cpuUsage.toFixed(1)}%`;
+            if (memoryValue) memoryValue.textContent = `${memoryUsage.toFixed(1)}%`;
+            if (diskValue) diskValue.textContent = `${diskUsage.toFixed(1)}%`;
+            if (networkValue) networkValue.textContent = `${this.formatBytes(networkTotal)}`;
+
+            // 绘制简单的图表
+            this.drawSimpleChart('cpuChart', cpuUsage, '% CPU');
+            this.drawSimpleChart('memoryChart', memoryUsage, '% Memory');
+            this.drawSimpleChart('diskChart', diskUsage, '% Disk');
+            this.drawNetworkChart('networkChart', this.systemStats.network);
         }
-        
-        // 这里应该使用图表库（如Chart.js）来绘制图表
-        // 由于没有引入图表库，这里只是占位符
-        console.log('Charts data:', chartsData);
+    }
+
+    // 绘制简单的图表
+    drawSimpleChart(canvasId, value, label) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas) return;
+
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+
+        // 清除画布
+        ctx.clearRect(0, 0, width, height);
+
+        // 设置样式
+        ctx.fillStyle = '#f0f0f0';
+        ctx.fillRect(0, 0, width, height);
+
+        // 绘制进度条
+        const barHeight = 20;
+        const barY = height / 2 - barHeight / 2;
+        const barWidth = width - 40;
+        const barX = 20;
+
+        // 背景
+        ctx.fillStyle = '#e0e0e0';
+        ctx.fillRect(barX, barY, barWidth, barHeight);
+
+        // 进度
+        const progressWidth = (barWidth * value) / 100;
+        ctx.fillStyle = value > 80 ? '#ff4444' : value > 60 ? '#ffaa00' : '#44aa44';
+        ctx.fillRect(barX, barY, progressWidth, barHeight);
+
+        // 文字
+        ctx.fillStyle = '#333';
+        ctx.font = '14px Arial';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${value.toFixed(1)}${label}`, width / 2, barY - 10);
+    }
+
+    // 绘制网络图表
+    drawNetworkChart(canvasId, networkData) {
+        const canvas = document.getElementById(canvasId);
+        if (!canvas || !networkData) return;
+
+        const ctx = canvas.getContext('2d');
+        const width = canvas.width;
+        const height = canvas.height;
+
+        // 清除画布
+        ctx.clearRect(0, 0, width, height);
+
+        // 设置样式
+        ctx.fillStyle = '#f0f0f0';
+        ctx.fillRect(0, 0, width, height);
+
+        // 绘制上传和下载
+        const recv = networkData.bytes_recv || 0;
+        const sent = networkData.bytes_sent || 0;
+
+        ctx.fillStyle = '#333';
+        ctx.font = '12px Arial';
+        ctx.textAlign = 'left';
+        ctx.fillText(`↓ ${this.formatBytes(recv)}`, 10, height / 2 - 10);
+        ctx.fillText(`↑ ${this.formatBytes(sent)}`, 10, height / 2 + 20);
     }
     
     // 格式化字节数

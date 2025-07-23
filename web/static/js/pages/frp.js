@@ -1,11 +1,16 @@
-// FRP内网穿透页面管理器
+// OpenFRP内网穿透页面管理器
 class FRPPageManager {
     constructor() {
-        this.frpConfig = null;
+        this.userInfo = null;
+        this.nodes = new Map();
         this.tunnels = new Map();
         this.selectedTunnels = new Set();
         this.searchQuery = '';
-        this.currentTab = 'tunnels'; // tunnels, config, logs
+        this.currentTab = 'auth'; // auth, tunnels, nodes, logs
+        this.isAuthenticated = false;
+        this.authorization = null; // OpenFrp Authorization token
+        this.apiBase = 'https://api.openfrp.net';
+        this.userAgent = 'EasilyPanel5/1.1.0';
     }
     
     // 初始化页面
@@ -19,13 +24,21 @@ class FRPPageManager {
     renderPage() {
         const frpPage = document.getElementById('frp-page');
         if (!frpPage) return;
-        
+
         frpPage.innerHTML = `
             <div class="page-header">
-                <h2>内网穿透</h2>
-                <p>管理FRP隧道和配置</p>
+                <h2>OpenFRP 内网穿透</h2>
+                <p>基于 OpenFRP 的内网穿透服务管理</p>
+                ${this.isAuthenticated ? `
+                    <div class="user-info">
+                        <span class="user-status">
+                            <i class="mdi mdi-account-check"></i>
+                            已认证用户
+                        </span>
+                    </div>
+                ` : ''}
             </div>
-            
+
             <div class="frp-container">
                 ${this.renderTabs()}
                 ${this.renderTabContent()}
@@ -37,13 +50,17 @@ class FRPPageManager {
     renderTabs() {
         return `
             <div class="frp-tabs">
-                <button class="tab-btn ${this.currentTab === 'tunnels' ? 'active' : ''}" data-tab="tunnels">
+                <button class="tab-btn ${this.currentTab === 'auth' ? 'active' : ''}" data-tab="auth">
+                    <i class="mdi mdi-key"></i>
+                    <span>身份认证</span>
+                </button>
+                <button class="tab-btn ${this.currentTab === 'tunnels' ? 'active' : ''}" data-tab="tunnels" ${!this.isAuthenticated ? 'disabled' : ''}>
                     <i class="mdi mdi-tunnel"></i>
                     <span>隧道管理</span>
                 </button>
-                <button class="tab-btn ${this.currentTab === 'config' ? 'active' : ''}" data-tab="config">
-                    <i class="mdi mdi-cog"></i>
-                    <span>FRP配置</span>
+                <button class="tab-btn ${this.currentTab === 'nodes' ? 'active' : ''}" data-tab="nodes" ${!this.isAuthenticated ? 'disabled' : ''}>
+                    <i class="mdi mdi-server-network"></i>
+                    <span>节点列表</span>
                 </button>
                 <button class="tab-btn ${this.currentTab === 'logs' ? 'active' : ''}" data-tab="logs">
                     <i class="mdi mdi-text-box"></i>
@@ -57,11 +74,14 @@ class FRPPageManager {
     renderTabContent() {
         return `
             <div class="tab-content">
+                <div class="tab-pane ${this.currentTab === 'auth' ? 'active' : ''}" id="auth-tab">
+                    ${this.renderAuthTab()}
+                </div>
                 <div class="tab-pane ${this.currentTab === 'tunnels' ? 'active' : ''}" id="tunnels-tab">
                     ${this.renderTunnelsTab()}
                 </div>
-                <div class="tab-pane ${this.currentTab === 'config' ? 'active' : ''}" id="config-tab">
-                    ${this.renderConfigTab()}
+                <div class="tab-pane ${this.currentTab === 'nodes' ? 'active' : ''}" id="nodes-tab">
+                    ${this.renderNodesTab()}
                 </div>
                 <div class="tab-pane ${this.currentTab === 'logs' ? 'active' : ''}" id="logs-tab">
                     ${this.renderLogsTab()}
@@ -69,9 +89,119 @@ class FRPPageManager {
             </div>
         `;
     }
-    
+
+    // 渲染身份认证标签页
+    renderAuthTab() {
+        if (this.isAuthenticated && this.userInfo) {
+            return `
+                <div class="auth-success">
+                    <div class="user-card">
+                        <div class="user-avatar">
+                            <i class="mdi mdi-account-circle"></i>
+                        </div>
+                        <div class="user-details">
+                            <h3>${this.userInfo.username}</h3>
+                            <p class="user-email">${this.userInfo.email}</p>
+                            <p class="user-group">${this.userInfo.friendlyGroup}</p>
+                            <div class="user-stats">
+                                <div class="stat-item">
+                                    <span class="stat-label">隧道数量</span>
+                                    <span class="stat-value">${this.userInfo.used}/${this.userInfo.proxies}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">剩余流量</span>
+                                    <span class="stat-value">${this.formatTraffic(this.userInfo.traffic)}</span>
+                                </div>
+                                <div class="stat-item">
+                                    <span class="stat-label">带宽限制</span>
+                                    <span class="stat-value">${this.userInfo.inLimit}/${this.userInfo.outLimit} Kbps</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="user-actions">
+                            <button class="btn secondary" id="logoutBtn">
+                                <i class="mdi mdi-logout"></i>
+                                <span>退出登录</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        } else {
+            return `
+                <div class="auth-form">
+                    <div class="auth-header">
+                        <h3>OpenFrp 身份认证</h3>
+                        <p>请选择认证方式登录到 OpenFrp 服务</p>
+                    </div>
+
+                    <div class="auth-methods">
+                        <div class="auth-method recommended">
+                            <div class="method-header">
+                                <h4>
+                                    <i class="mdi mdi-shield-check"></i>
+                                    Authorization 登录（推荐）
+                                </h4>
+                                <span class="method-badge">安全</span>
+                            </div>
+                            <p class="method-description">
+                                在 OpenFrp 管理面板的个人中心获取 Authorization 密钥，安全便捷。
+                            </p>
+                            <div class="auth-input-group">
+                                <label for="authToken">Authorization 密钥</label>
+                                <textarea id="authToken" placeholder="请粘贴从 OpenFrp 面板获取的 Authorization 密钥" rows="3"></textarea>
+                                <div class="input-help">
+                                    <a href="https://console.openfrp.net/usercenter" target="_blank">
+                                        <i class="mdi mdi-open-in-new"></i>
+                                        前往 OpenFrp 面板获取
+                                    </a>
+                                </div>
+                            </div>
+                            <button class="btn primary" id="authLoginBtn">
+                                <i class="mdi mdi-login"></i>
+                                <span>登录</span>
+                            </button>
+                        </div>
+
+                        <div class="auth-method">
+                            <div class="method-header">
+                                <h4>
+                                    <i class="mdi mdi-web"></i>
+                                    远程安全登录
+                                </h4>
+                                <span class="method-badge">高级</span>
+                            </div>
+                            <p class="method-description">
+                                通过浏览器授权登录，更加安全但需要额外步骤。
+                            </p>
+                            <button class="btn secondary" id="remoteLoginBtn">
+                                <i class="mdi mdi-launch"></i>
+                                <span>启动远程登录</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+    }
+
     // 渲染隧道管理标签页
     renderTunnelsTab() {
+        if (!this.isAuthenticated) {
+            return `
+                <div class="auth-required">
+                    <div class="auth-prompt">
+                        <i class="mdi mdi-lock"></i>
+                        <h3>需要身份认证</h3>
+                        <p>请先在身份认证标签页完成登录</p>
+                        <button class="btn primary" onclick="window.getFRPPageManager().switchTab('auth')">
+                            前往认证
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
         return `
             <div class="tunnels-toolbar">
                 <div class="toolbar-left">
@@ -79,41 +209,49 @@ class FRPPageManager {
                         <i class="mdi mdi-magnify"></i>
                         <input type="text" id="tunnelSearch" placeholder="搜索隧道..." value="${this.searchQuery}">
                     </div>
-                    
+
                     <div class="status-filter">
                         <select id="statusFilter" class="filter-select">
                             <option value="all">全部状态</option>
                             <option value="online">在线</option>
                             <option value="offline">离线</option>
-                            <option value="error">错误</option>
+                        </select>
+                    </div>
+
+                    <div class="type-filter">
+                        <select id="typeFilter" class="filter-select">
+                            <option value="all">全部类型</option>
+                            <option value="tcp">TCP</option>
+                            <option value="udp">UDP</option>
+                            <option value="http">HTTP</option>
+                            <option value="https">HTTPS</option>
+                            <option value="stcp">STCP</option>
+                            <option value="xtcp">XTCP</option>
                         </select>
                     </div>
                 </div>
-                
+
                 <div class="toolbar-right">
                     <div class="batch-actions" id="batchActions" style="display: none;">
                         <span class="selected-count" id="selectedCount">已选择 0 个隧道</span>
-                        <button class="btn" id="batchStartBtn">
-                            <i class="mdi mdi-play"></i>
-                            <span>批量启动</span>
-                        </button>
-                        <button class="btn" id="batchStopBtn">
-                            <i class="mdi mdi-stop"></i>
-                            <span>批量停止</span>
-                        </button>
                         <button class="btn warning" id="batchDeleteBtn">
                             <i class="mdi mdi-delete"></i>
                             <span>批量删除</span>
                         </button>
                     </div>
-                    
+
+                    <button class="btn secondary" id="refreshTunnelsBtn">
+                        <i class="mdi mdi-refresh"></i>
+                        <span>刷新</span>
+                    </button>
+
                     <button class="btn primary" id="createTunnelBtn">
                         <i class="mdi mdi-plus"></i>
                         <span>创建隧道</span>
                     </button>
                 </div>
             </div>
-            
+
             <div class="tunnels-list-container">
                 <div class="tunnels-list" id="tunnelsList">
                     <div class="loading">
@@ -124,7 +262,69 @@ class FRPPageManager {
             </div>
         `;
     }
-    
+
+    // 渲染节点列表标签页
+    renderNodesTab() {
+        if (!this.isAuthenticated) {
+            return `
+                <div class="auth-required">
+                    <div class="auth-prompt">
+                        <i class="mdi mdi-lock"></i>
+                        <h3>需要身份认证</h3>
+                        <p>请先在身份认证标签页完成登录</p>
+                        <button class="btn primary" onclick="window.getFRPPageManager().switchTab('auth')">
+                            前往认证
+                        </button>
+                    </div>
+                </div>
+            `;
+        }
+
+        return `
+            <div class="nodes-toolbar">
+                <div class="toolbar-left">
+                    <div class="search-box">
+                        <i class="mdi mdi-magnify"></i>
+                        <input type="text" id="nodeSearch" placeholder="搜索节点..." value="">
+                    </div>
+
+                    <div class="region-filter">
+                        <select id="regionFilter" class="filter-select">
+                            <option value="all">全部地区</option>
+                            <option value="1">中国大陆</option>
+                            <option value="2">港澳台地区</option>
+                            <option value="3">海外地区</option>
+                        </select>
+                    </div>
+
+                    <div class="status-filter">
+                        <select id="nodeStatusFilter" class="filter-select">
+                            <option value="all">全部状态</option>
+                            <option value="200">正常</option>
+                            <option value="other">异常</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="toolbar-right">
+                    <button class="btn secondary" id="refreshNodesBtn">
+                        <i class="mdi mdi-refresh"></i>
+                        <span>刷新节点</span>
+                    </button>
+                </div>
+            </div>
+
+            <div class="nodes-list-container">
+                <div class="nodes-list" id="nodesList">
+                    <div class="loading">
+                        <i class="mdi mdi-loading mdi-spin"></i>
+                        <span>加载节点列表...</span>
+                    </div>
+                </div>
+            </div>
+        `;
+    }
+
     // 渲染配置标签页
     renderConfigTab() {
         return `
@@ -899,48 +1099,197 @@ class FRPPageManager {
         console.log('Edit tunnel:', tunnelId);
     }
     
-    copyTunnelConfig(tunnelId) {
-        console.log('Copy tunnel config:', tunnelId);
+    // OpenFrp API 调用方法
+
+    // Authorization 登录
+    async loginWithAuthorization(authToken) {
+        try {
+            // 验证 Authorization 是否有效
+            const response = await this.apiCall('/frp/api/getUserInfo', 'POST', null, authToken);
+
+            if (response.flag) {
+                this.authorization = authToken;
+                this.userInfo = response.data;
+                this.isAuthenticated = true;
+
+                // 保存到本地存储
+                localStorage.setItem('openfrp_authorization', authToken);
+
+                return { success: true, data: response.data };
+            } else {
+                return { success: false, message: response.msg || '认证失败' };
+            }
+        } catch (error) {
+            console.error('Authorization login failed:', error);
+            return { success: false, message: '网络错误，请重试' };
+        }
     }
-    
-    showTunnelLogs(tunnelId) {
-        console.log('Show tunnel logs:', tunnelId);
+
+    // 退出登录
+    logout() {
+        this.authorization = null;
+        this.userInfo = null;
+        this.isAuthenticated = false;
+        this.tunnels.clear();
+        this.nodes.clear();
+
+        // 清除本地存储
+        localStorage.removeItem('openfrp_authorization');
+
+        // 重新渲染页面
+        this.renderPage();
     }
-    
-    showDeleteTunnelDialog(tunnelId) {
-        console.log('Delete tunnel:', tunnelId);
+
+    // 获取用户隧道列表
+    async getUserTunnels() {
+        try {
+            const response = await this.apiCall('/frp/api/getUserProxies', 'POST');
+
+            if (response.flag) {
+                return { success: true, data: response.data };
+            } else {
+                return { success: false, message: response.msg || '获取隧道列表失败' };
+            }
+        } catch (error) {
+            console.error('Get user tunnels failed:', error);
+            return { success: false, message: '网络错误，请重试' };
+        }
     }
-    
-    async startFRP() {
-        console.log('Start FRP');
+
+    // 获取节点列表
+    async getNodeList() {
+        try {
+            const response = await this.apiCall('/frp/api/getNodeList', 'POST');
+
+            if (response.flag) {
+                return { success: true, data: response.data };
+            } else {
+                return { success: false, message: response.msg || '获取节点列表失败' };
+            }
+        } catch (error) {
+            console.error('Get node list failed:', error);
+            return { success: false, message: '网络错误，请重试' };
+        }
     }
-    
-    async stopFRP() {
-        console.log('Stop FRP');
+
+    // 创建新隧道
+    async createNewTunnel(tunnelData) {
+        try {
+            const response = await this.apiCall('/frp/api/newProxy', 'POST', tunnelData);
+
+            if (response.flag) {
+                return { success: true, message: response.msg || '创建成功' };
+            } else {
+                return { success: false, message: response.msg || '创建隧道失败' };
+            }
+        } catch (error) {
+            console.error('Create tunnel failed:', error);
+            return { success: false, message: '网络错误，请重试' };
+        }
     }
-    
-    async restartFRP() {
-        console.log('Restart FRP');
+
+    // 删除隧道
+    async deleteTunnel(proxyId) {
+        try {
+            const response = await this.apiCall('/frp/api/removeProxy', 'POST', { proxy_id: proxyId });
+
+            if (response.flag) {
+                return { success: true, message: response.msg || '删除成功' };
+            } else {
+                return { success: false, message: response.msg || '删除隧道失败' };
+            }
+        } catch (error) {
+            console.error('Delete tunnel failed:', error);
+            return { success: false, message: '网络错误，请重试' };
+        }
     }
-    
-    async testFRPConfig() {
-        console.log('Test FRP config');
+
+    // 编辑隧道
+    async editTunnel(tunnelData) {
+        try {
+            const response = await this.apiCall('/frp/api/editProxy', 'POST', tunnelData);
+
+            if (response.flag) {
+                return { success: true, message: response.msg || '保存成功' };
+            } else {
+                return { success: false, message: response.msg || '保存失败' };
+            }
+        } catch (error) {
+            console.error('Edit tunnel failed:', error);
+            return { success: false, message: '网络错误，请重试' };
+        }
     }
-    
-    async saveFRPConfig() {
-        console.log('Save FRP config');
+
+    // 通用 API 调用方法
+    async apiCall(endpoint, method = 'GET', data = null, authToken = null) {
+        const url = this.apiBase + endpoint;
+        const headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': this.userAgent
+        };
+
+        // 添加 Authorization 头
+        const token = authToken || this.authorization;
+        if (token) {
+            headers['Authorization'] = token;
+        }
+
+        const options = {
+            method: method,
+            headers: headers
+        };
+
+        if (data && (method === 'POST' || method === 'PUT')) {
+            options.body = JSON.stringify(data);
+        }
+
+        const response = await fetch(url, options);
+
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+
+        return await response.json();
     }
-    
-    async loadLogs() {
-        console.log('Load logs');
+
+    // 工具方法
+    formatTraffic(traffic) {
+        if (traffic < 1024) {
+            return `${traffic} MB`;
+        } else {
+            return `${(traffic / 1024).toFixed(2)} GB`;
+        }
     }
-    
-    async clearLogs() {
-        console.log('Clear logs');
+
+    formatBytes(bytes) {
+        if (bytes === 0) return '0 B';
+
+        const k = 1024;
+        const sizes = ['B', 'KB', 'MB', 'GB', 'TB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
     }
-    
-    async downloadLogs() {
-        console.log('Download logs');
+
+    getRegionName(classify) {
+        const regions = {
+            1: '中国大陆',
+            2: '港澳台地区',
+            3: '海外地区'
+        };
+        return regions[classify] || '未知地区';
+    }
+
+    getTunnelTypeIcon(type) {
+        const icons = {
+            'tcp': 'mdi-ethernet',
+            'udp': 'mdi-ethernet',
+            'http': 'mdi-web',
+            'https': 'mdi-web',
+            'stcp': 'mdi-ethernet-cable',
+            'xtcp': 'mdi-ethernet-cable'
+        };
+        return icons[type] || 'mdi-help-circle';
     }
 }
 

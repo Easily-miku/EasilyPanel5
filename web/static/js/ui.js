@@ -202,11 +202,11 @@ class UIManager {
         const pageNames = {
             'dashboard': '仪表盘',
             'servers': '服务器管理',
-            'templates': '服务器模板',
             'groups': '服务器分组',
             'frp': '内网穿透',
             'files': '文件管理',
             'monitoring': '监控面板',
+            'download': '下载中心',
             'settings': '系统设置',
             'auth': '双因素认证'
         };
@@ -225,9 +225,6 @@ class UIManager {
             case 'servers':
                 this.loadServersPage();
                 break;
-            case 'templates':
-                this.loadTemplatesPage();
-                break;
             case 'groups':
                 this.loadGroupsPage();
                 break;
@@ -239,6 +236,9 @@ class UIManager {
                 break;
             case 'monitoring':
                 this.loadMonitoringPage();
+                break;
+            case 'download':
+                this.loadDownloadPage();
                 break;
             case 'settings':
                 this.loadSettingsPage();
@@ -427,7 +427,12 @@ class UIManager {
     // 页面加载方法（占位符，将在后续实现）
     loadDashboard() {
         console.log('加载仪表盘');
-        // 仪表盘内容已在HTML中定义
+        // 仪表盘内容已在HTML中定义，数据由app.js中的数据更新方法处理
+
+        // 如果应用实例存在，触发数据刷新
+        if (window.app) {
+            window.app.refreshData();
+        }
     }
     
     loadServersPage() {
@@ -450,28 +455,7 @@ class UIManager {
         }
     }
     
-    loadTemplatesPage() {
-        console.log('加载模板页面');
 
-        // 等待模板页面管理器初始化
-        if (window.getTemplatesPageManager) {
-            const templatesPageManager = window.getTemplatesPageManager();
-            if (templatesPageManager) {
-                templatesPageManager.init();
-            } else {
-                // 如果还没有初始化，等待一下再试
-                setTimeout(() => {
-                    const templatesPageManager = window.getTemplatesPageManager();
-                    if (templatesPageManager) {
-                        templatesPageManager.init();
-                    }
-                }, 100);
-            }
-        }
-    }
-    
-
-    
     loadFRPPage() {
         console.log('加载FRP页面');
 
@@ -532,6 +516,26 @@ class UIManager {
         }
     }
     
+    loadDownloadPage() {
+        console.log('加载下载页面');
+
+        // 等待下载页面管理器初始化
+        if (window.getDownloadPageManager) {
+            const downloadPageManager = window.getDownloadPageManager();
+            if (downloadPageManager) {
+                downloadPageManager.init();
+            } else {
+                // 如果还没有初始化，等待一下再试
+                setTimeout(() => {
+                    const downloadPageManager = window.getDownloadPageManager();
+                    if (downloadPageManager) {
+                        downloadPageManager.init();
+                    }
+                }, 100);
+            }
+        }
+    }
+
     loadSettingsPage() {
         console.log('加载设置页面');
 

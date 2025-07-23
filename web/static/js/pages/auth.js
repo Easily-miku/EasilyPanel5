@@ -111,6 +111,10 @@ class AuthPageManager {
                                 <i class="mdi mdi-refresh"></i>
                                 <span>重新生成备用码</span>
                             </button>
+                            <button class="btn info" id="testTotpBtn">
+                                <i class="mdi mdi-test-tube"></i>
+                                <span>测试验证码</span>
+                            </button>
                             <button class="btn warning" id="disableTotpBtn">
                                 <i class="mdi mdi-shield-off"></i>
                                 <span>禁用双因素认证</span>
@@ -207,7 +211,13 @@ class AuthPageManager {
         if (regenerateBackupBtn) {
             regenerateBackupBtn.addEventListener('click', () => this.regenerateBackupCodes());
         }
-        
+
+        // 测试TOTP按钮
+        const testTotpBtn = document.getElementById('testTotpBtn');
+        if (testTotpBtn) {
+            testTotpBtn.addEventListener('click', () => this.showTOTPTestDialog());
+        }
+
         // 刷新日志按钮
         const refreshLogsBtn = document.getElementById('refreshLogsBtn');
         if (refreshLogsBtn) {
@@ -269,6 +279,15 @@ class AuthPageManager {
                             <span>确认</span>
                         </button>
                     </div>
+                    <div class="setup-tips">
+                        <h5>重要提示：</h5>
+                        <ul>
+                            <li>确保您的设备时间与服务器时间同步</li>
+                            <li>验证码每30秒更新一次，请使用最新的验证码</li>
+                            <li>如果验证失败，请等待下一个验证码再试</li>
+                            <li>建议使用Google Authenticator或Authy等知名应用</li>
+                        </ul>
+                    </div>
                 </div>
             </div>
         `;
@@ -297,14 +316,21 @@ class AuthPageManager {
                 
                 try {
                     const result = await this.authManager.confirmTOTP(this.totpSecret, code);
-                    
+
                     if (result.success) {
                         uiManager?.closeModal();
                         this.showBackupCodesDialog(result.backup_codes);
                         this.renderPage(); // 重新渲染页面
                         uiManager?.showNotification('设置成功', '双因素认证已启用', 'success');
                     } else {
-                        uiManager?.showNotification('验证失败', result.message, 'error');
+                        let errorMessage = result.message || '验证码无效';
+
+                        // 提供更详细的错误提示
+                        if (errorMessage.includes('Invalid verification code')) {
+                            errorMessage = '验证码无效。请确保：\n• 手机时间与服务器时间同步\n• 输入的是最新的6位验证码\n• 验证码未过期（30秒内有效）';
+                        }
+
+                        uiManager?.showNotification('验证失败', errorMessage, 'error');
                     }
                 } catch (error) {
                     console.error('TOTP confirmation failed:', error);
@@ -555,6 +581,139 @@ class AuthPageManager {
         logsContainer.innerHTML = `
             <div class="logs-list">
                 ${logItems}
+            </div>
+        `;
+    }
+
+    // 显示TOTP测试对话框
+    showTOTPTestDialog() {
+        const uiManager = window.getUIManager();
+
+        const content = `
+            <div class="totp-test">
+                <div class="test-description">
+                    <p>输入您的认证应用显示的6位验证码来测试TOTP功能：</p>
+                </div>
+
+                <div class="totp-input-group">
+                    <input type="text" id="testTotpCode" class="totp-input" placeholder="000000" maxlength="6" pattern="[0-9]{6}">
+                    <button class="btn primary" id="testTotpSubmitBtn">
+                        <i class="mdi mdi-test-tube"></i>
+                        <span>测试</span>
+                    </button>
+                </div>
+
+                <div class="test-result" id="testResult" style="display: none;">
+                    <!-- 测试结果将显示在这里 -->
+                </div>
+            </div>
+        `;
+
+        const modal = uiManager?.showModal('测试双因素认证', content, {
+            width: '500px',
+            footer: `
+                <button class="btn" onclick="window.getUIManager().closeModal()">
+                    <i class="mdi mdi-close"></i>
+                    <span>关闭</span>
+                </button>
+            `
+        });
+
+        if (modal) {
+            const testBtn = modal.querySelector('#testTotpSubmitBtn');
+            const testInput = modal.querySelector('#testTotpCode');
+            const resultDiv = modal.querySelector('#testResult');
+
+            const testCode = async () => {
+                const code = testInput.value.trim();
+                if (code.length !== 6) {
+                    uiManager?.showNotification('输入错误', '请输入6位验证码', 'warning');
+                    return;
+                }
+
+                try {
+                    const response = await fetch('/api/auth/totp/debug', {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${this.authManager.getToken()}`
+                        },
+                        body: JSON.stringify({ code: code })
+                    });
+
+                    const result = await response.json();
+
+                    if (result.success) {
+                        resultDiv.style.display = 'block';
+                        resultDiv.innerHTML = this.renderTestResult(result.valid, result.debug_info);
+                    } else {
+                        uiManager?.showNotification('测试失败', result.message, 'error');
+                    }
+                } catch (error) {
+                    console.error('TOTP test failed:', error);
+                    uiManager?.showNotification('测试失败', '网络错误，请重试', 'error');
+                }
+            };
+
+            testBtn.addEventListener('click', testCode);
+            testInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    testCode();
+                }
+            });
+        }
+    }
+
+    // 渲染测试结果
+    renderTestResult(valid, debugInfo) {
+        const statusClass = valid ? 'success' : 'error';
+        const statusIcon = valid ? 'mdi-check-circle' : 'mdi-close-circle';
+        const statusText = valid ? '验证成功' : '验证失败';
+
+        let testedCodes = '';
+        if (debugInfo.tested_codes) {
+            testedCodes = debugInfo.tested_codes.map(code => `
+                <tr class="${code.matches ? 'match' : ''}">
+                    <td>${code.timestep}</td>
+                    <td>${new Date(code.timestamp * 1000).toLocaleTimeString()}</td>
+                    <td>${code.expected_code}</td>
+                    <td>${code.matches ? '✓' : '✗'}</td>
+                </tr>
+            `).join('');
+        }
+
+        return `
+            <div class="test-result-content">
+                <div class="result-status ${statusClass}">
+                    <i class="mdi ${statusIcon}"></i>
+                    <span>${statusText}</span>
+                </div>
+
+                <div class="debug-info">
+                    <h5>调试信息：</h5>
+                    <div class="debug-details">
+                        <p><strong>当前时间：</strong> ${new Date(debugInfo.current_time * 1000).toLocaleString()}</p>
+                        <p><strong>当前时间步：</strong> ${debugInfo.current_timestep}</p>
+                        <p><strong>时间窗口：</strong> ±${debugInfo.window} 步 (±${debugInfo.window * debugInfo.period} 秒)</p>
+                    </div>
+
+                    <div class="tested-codes">
+                        <h6>测试的验证码：</h6>
+                        <table class="codes-table">
+                            <thead>
+                                <tr>
+                                    <th>时间步</th>
+                                    <th>时间</th>
+                                    <th>验证码</th>
+                                    <th>匹配</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${testedCodes}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
             </div>
         `;
     }

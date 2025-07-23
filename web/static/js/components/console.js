@@ -6,7 +6,11 @@ class ServerConsoleComponent {
             maxLines: 1000,
             autoScroll: true,
             showTimestamp: true,
+            showLevel: true,
+            showThread: false,
+            showLogger: false,
             enableInput: true,
+            enableFilters: true,
             ...options
         };
         
@@ -47,12 +51,56 @@ class ServerConsoleComponent {
                             <i class="mdi mdi-arrow-down"></i>
                             <span>自动滚动</span>
                         </button>
+                        <button class="btn small" id="filterToggleBtn">
+                            <i class="mdi mdi-filter"></i>
+                            <span>过滤</span>
+                        </button>
                         <button class="btn small" id="closeConsoleBtn">
                             <i class="mdi mdi-close"></i>
                             <span>关闭</span>
                         </button>
                     </div>
                 </div>
+
+                ${this.options.enableFilters ? `
+                <div class="console-filters" id="consoleFilters" style="display: none;">
+                    <div class="filter-row">
+                        <div class="filter-group">
+                            <label>搜索:</label>
+                            <input type="text" id="logSearchInput" placeholder="搜索日志内容...">
+                        </div>
+                        <div class="filter-group">
+                            <label>级别:</label>
+                            <select id="logLevelFilter">
+                                <option value="">全部</option>
+                                <option value="ERROR">错误</option>
+                                <option value="WARN">警告</option>
+                                <option value="INFO">信息</option>
+                                <option value="DEBUG">调试</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <label>行数:</label>
+                            <select id="logLinesFilter">
+                                <option value="100">100行</option>
+                                <option value="500">500行</option>
+                                <option value="1000">1000行</option>
+                                <option value="5000">5000行</option>
+                            </select>
+                        </div>
+                        <div class="filter-group">
+                            <button class="btn small primary" id="applyFiltersBtn">
+                                <i class="mdi mdi-check"></i>
+                                <span>应用</span>
+                            </button>
+                            <button class="btn small" id="resetFiltersBtn">
+                                <i class="mdi mdi-refresh"></i>
+                                <span>重置</span>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+                ` : ''}
                 
                 <div class="console-body">
                     <div class="console-logs" id="consoleLogs">
@@ -205,7 +253,35 @@ class ServerConsoleComponent {
         // 自动滚动按钮
         const autoScrollBtn = this.container.querySelector('#autoScrollBtn');
         autoScrollBtn.addEventListener('click', () => this.toggleAutoScroll());
-        
+
+        // 过滤切换按钮
+        const filterToggleBtn = this.container.querySelector('#filterToggleBtn');
+        if (filterToggleBtn) {
+            filterToggleBtn.addEventListener('click', () => this.toggleFilters());
+        }
+
+        // 应用过滤器按钮
+        const applyFiltersBtn = this.container.querySelector('#applyFiltersBtn');
+        if (applyFiltersBtn) {
+            applyFiltersBtn.addEventListener('click', () => this.applyFilters());
+        }
+
+        // 重置过滤器按钮
+        const resetFiltersBtn = this.container.querySelector('#resetFiltersBtn');
+        if (resetFiltersBtn) {
+            resetFiltersBtn.addEventListener('click', () => this.resetFilters());
+        }
+
+        // 搜索输入框回车事件
+        const searchInput = this.container.querySelector('#logSearchInput');
+        if (searchInput) {
+            searchInput.addEventListener('keydown', (e) => {
+                if (e.key === 'Enter') {
+                    this.applyFilters();
+                }
+            });
+        }
+
         // 发送命令按钮
         const sendBtn = this.container.querySelector('#sendCommandBtn');
         if (sendBtn) {
@@ -277,19 +353,29 @@ class ServerConsoleComponent {
     }
     
     // 加载最近的日志
-    async loadRecentLogs() {
+    async loadRecentLogs(options = {}) {
         try {
-            const response = await fetch(`/api/servers/${this.serverId}/logs?lines=100`);
+            // 构建查询参数
+            const params = new URLSearchParams({
+                lines: options.lines || 100
+            });
+
+            if (options.level) params.append('level', options.level);
+            if (options.search) params.append('search', options.search);
+            if (options.startTime) params.append('start_time', options.startTime);
+            if (options.endTime) params.append('end_time', options.endTime);
+
+            const response = await fetch(`/api/servers/${this.serverId}/logs?${params}`);
             const result = await response.json();
-            
+
             if (response.ok && result.success) {
                 const logs = result.data || [];
                 this.logContainer.innerHTML = '';
-                
+
                 logs.forEach(log => {
-                    this.addLogLine(log.message, log.level || 'INFO', new Date(log.timestamp));
+                    this.addLogLine(log.message || log.raw, log.level || 'INFO', this.parseTimestamp(log.timestamp), log);
                 });
-                
+
                 if (logs.length === 0) {
                     this.logContainer.innerHTML = '<div class="console-loading">暂无日志</div>';
                 }
@@ -302,8 +388,27 @@ class ServerConsoleComponent {
         }
     }
 
+    // 解析时间戳
+    parseTimestamp(timestamp) {
+        if (!timestamp) return new Date();
+
+        // 尝试不同的时间戳格式
+        if (typeof timestamp === 'string') {
+            // ISO格式
+            if (timestamp.includes('T')) {
+                return new Date(timestamp);
+            }
+            // 简单格式 "2006-01-02 15:04:05"
+            if (timestamp.includes('-') && timestamp.includes(':')) {
+                return new Date(timestamp.replace(' ', 'T') + 'Z');
+            }
+        }
+
+        return new Date(timestamp);
+    }
+
     // 添加日志行
-    addLogLine(message, level = 'INFO', timestamp = new Date()) {
+    addLogLine(message, level = 'INFO', timestamp = new Date(), logData = null) {
         // 移除加载提示
         const loading = this.logContainer.querySelector('.console-loading');
         if (loading) {
@@ -311,23 +416,41 @@ class ServerConsoleComponent {
         }
 
         const logLine = document.createElement('div');
-        logLine.className = `console-log-line console-log-level-${level}`;
+        logLine.className = `console-log-line console-log-level-${level.toLowerCase()}`;
 
         let content = '';
+
+        // 时间戳
         if (this.options.showTimestamp) {
             const timeStr = timestamp.toLocaleTimeString();
             content += `<span class="console-log-timestamp">[${timeStr}]</span>`;
         }
 
-        // 处理ANSI颜色代码（简单实现）
+        // 日志级别
+        if (this.options.showLevel) {
+            content += `<span class="console-log-level">[${level}]</span>`;
+        }
+
+        // 线程信息（如果有）
+        if (logData && logData.thread && this.options.showThread) {
+            content += `<span class="console-log-thread">[${logData.thread}]</span>`;
+        }
+
+        // 日志器信息（如果有）
+        if (logData && logData.logger && this.options.showLogger) {
+            content += `<span class="console-log-logger">[${logData.logger}]</span>`;
+        }
+
+        // 处理ANSI颜色代码
         const processedMessage = this.processAnsiColors(message);
-        content += processedMessage;
+        content += `<span class="console-log-message">${processedMessage}</span>`;
 
         logLine.innerHTML = content;
+        logLine.title = `${timestamp.toLocaleString()} [${level}] ${message}`;
         this.logContainer.appendChild(logLine);
 
         // 限制日志行数
-        this.logs.push({ message, level, timestamp });
+        this.logs.push({ message, level, timestamp, logData });
         if (this.logs.length > this.options.maxLines) {
             this.logs.shift();
             const firstLine = this.logContainer.firstElementChild;
@@ -446,6 +569,58 @@ class ServerConsoleComponent {
     // 滚动到底部
     scrollToBottom() {
         this.logContainer.scrollTop = this.logContainer.scrollHeight;
+    }
+
+    // 切换过滤器显示
+    toggleFilters() {
+        const filtersPanel = this.container.querySelector('#consoleFilters');
+        if (filtersPanel) {
+            const isVisible = filtersPanel.style.display !== 'none';
+            filtersPanel.style.display = isVisible ? 'none' : 'block';
+
+            const toggleBtn = this.container.querySelector('#filterToggleBtn');
+            if (toggleBtn) {
+                toggleBtn.classList.toggle('active', !isVisible);
+            }
+        }
+    }
+
+    // 应用过滤器
+    applyFilters() {
+        const searchInput = this.container.querySelector('#logSearchInput');
+        const levelFilter = this.container.querySelector('#logLevelFilter');
+        const linesFilter = this.container.querySelector('#logLinesFilter');
+
+        const options = {};
+
+        if (searchInput && searchInput.value.trim()) {
+            options.search = searchInput.value.trim();
+        }
+
+        if (levelFilter && levelFilter.value) {
+            options.level = levelFilter.value;
+        }
+
+        if (linesFilter && linesFilter.value) {
+            options.lines = parseInt(linesFilter.value);
+        }
+
+        // 重新加载日志
+        this.loadRecentLogs(options);
+    }
+
+    // 重置过滤器
+    resetFilters() {
+        const searchInput = this.container.querySelector('#logSearchInput');
+        const levelFilter = this.container.querySelector('#logLevelFilter');
+        const linesFilter = this.container.querySelector('#logLinesFilter');
+
+        if (searchInput) searchInput.value = '';
+        if (levelFilter) levelFilter.value = '';
+        if (linesFilter) linesFilter.value = '100';
+
+        // 重新加载日志
+        this.loadRecentLogs();
     }
 
     // 关闭控制台

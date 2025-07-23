@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -590,75 +592,6 @@ func handleFRPTunnelAction(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-// handleTemplates 处理模板列表
-func handleTemplates(w http.ResponseWriter, r *http.Request) {
-	switch r.Method {
-	case http.MethodGet:
-		templates := server.GetTemplateManager().GetAllTemplates()
-		writeJSONResponse(w, templates)
-
-	case http.MethodPost:
-		var template config.ServerTemplate
-		if err := json.NewDecoder(r.Body).Decode(&template); err != nil {
-			writeErrorResponse(w, "Invalid JSON", http.StatusBadRequest)
-			return
-		}
-
-		if err := server.GetTemplateManager().CreateTemplate(&template); err != nil {
-			writeErrorResponse(w, fmt.Sprintf("Failed to create template: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		writeJSONResponse(w, template)
-
-	default:
-		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-}
-
-// handleTemplateAction 处理单个模板操作
-func handleTemplateAction(w http.ResponseWriter, r *http.Request) {
-	templateID := strings.TrimPrefix(r.URL.Path, "/api/templates/")
-	if templateID == "" {
-		writeErrorResponse(w, "Missing template ID", http.StatusBadRequest)
-		return
-	}
-
-	switch r.Method {
-	case http.MethodGet:
-		template, err := server.GetTemplateManager().GetTemplate(templateID)
-		if err != nil {
-			writeErrorResponse(w, fmt.Sprintf("Template not found: %v", err), http.StatusNotFound)
-			return
-		}
-		writeJSONResponse(w, template)
-
-	case http.MethodPut:
-		var template config.ServerTemplate
-		if err := json.NewDecoder(r.Body).Decode(&template); err != nil {
-			writeErrorResponse(w, "Invalid JSON", http.StatusBadRequest)
-			return
-		}
-
-		template.ID = templateID
-		if err := server.GetTemplateManager().UpdateTemplate(&template); err != nil {
-			writeErrorResponse(w, fmt.Sprintf("Failed to update template: %v", err), http.StatusInternalServerError)
-			return
-		}
-
-		writeJSONResponse(w, template)
-
-	case http.MethodDelete:
-		if err := server.GetTemplateManager().DeleteTemplate(templateID); err != nil {
-			writeErrorResponse(w, fmt.Sprintf("Failed to delete template: %v", err), http.StatusInternalServerError)
-			return
-		}
-		writeJSONResponse(w, map[string]string{"status": "deleted"})
-
-	default:
-		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
-	}
-}
 
 // handleGroups 处理分组列表
 func handleGroups(w http.ResponseWriter, r *http.Request) {
@@ -805,33 +738,263 @@ func handleServerLogs(w http.ResponseWriter, r *http.Request) {
 	}
 	serverID := pathParts[3]
 
-	// 获取行数参数
+	// 获取查询参数
 	linesStr := r.URL.Query().Get("lines")
 	lines := 100 // 默认100行
 	if linesStr != "" {
-		if parsedLines, err := strconv.Atoi(linesStr); err == nil && parsedLines > 0 {
+		if parsedLines, err := strconv.Atoi(linesStr); err == nil && parsedLines > 0 && parsedLines <= 10000 {
 			lines = parsedLines
 		}
 	}
 
-	// 获取服务器日志
-	logs, err := server.GetServerLogs(serverID, lines)
+	// 获取过滤参数
+	levelFilter := r.URL.Query().Get("level")
+	searchQuery := r.URL.Query().Get("search")
+	startTime := r.URL.Query().Get("start_time")
+	endTime := r.URL.Query().Get("end_time")
+
+	// 获取服务器日志（获取更多行用于过滤）
+	fetchLines := lines
+	if levelFilter != "" || searchQuery != "" || startTime != "" || endTime != "" {
+		fetchLines = lines * 3 // 获取更多行用于过滤
+		if fetchLines > 10000 {
+			fetchLines = 10000
+		}
+	}
+
+	logs, err := server.GetServerLogs(serverID, fetchLines)
 	if err != nil {
 		WriteStandardError(w, "GET_LOGS_FAILED", fmt.Sprintf("Failed to get logs: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	// 转换为结构化格式
+	// 转换为结构化格式并应用过滤
 	var logEntries []map[string]interface{}
 	for _, logLine := range logs {
-		logEntries = append(logEntries, map[string]interface{}{
-			"message":   logLine,
-			"level":     "INFO", // 简化处理，实际可以解析日志级别
-			"timestamp": time.Now(), // 简化处理，实际应该解析时间戳
-		})
+		// 解析日志行
+		parsed := utils.ParseMinecraftLog(logLine)
+
+		// 构建日志条目
+		entry := map[string]interface{}{
+			"raw":       logLine,
+			"message":   parsed["message"],
+			"level":     parsed["level"],
+			"timestamp": parsed["timestamp"],
+			"thread":    parsed["thread"],
+			"logger":    parsed["logger"],
+		}
+
+		// 如果没有解析到时间戳，使用当前时间
+		if entry["timestamp"] == "" {
+			entry["timestamp"] = time.Now().Format("2006-01-02 15:04:05")
+		}
+
+		// 应用过滤器
+		if !passesFilters(entry, levelFilter, searchQuery, startTime, endTime) {
+			continue
+		}
+
+		logEntries = append(logEntries, entry)
+
+		// 达到所需行数就停止
+		if len(logEntries) >= lines {
+			break
+		}
 	}
 
 	WriteStandardResponse(w, logEntries)
+}
+
+// passesFilters 检查日志条目是否通过过滤器
+func passesFilters(entry map[string]interface{}, levelFilter, searchQuery, startTime, endTime string) bool {
+	// 级别过滤
+	if levelFilter != "" {
+		entryLevel := strings.ToUpper(entry["level"].(string))
+		filterLevel := strings.ToUpper(levelFilter)
+		if entryLevel != filterLevel {
+			return false
+		}
+	}
+
+	// 搜索过滤
+	if searchQuery != "" {
+		message := strings.ToLower(entry["message"].(string))
+		query := strings.ToLower(searchQuery)
+		if !strings.Contains(message, query) {
+			return false
+		}
+	}
+
+	// 时间过滤（简化实现）
+	if startTime != "" || endTime != "" {
+		// 这里可以添加时间范围过滤逻辑
+		// 由于时间戳格式可能不统一，暂时跳过
+	}
+
+	return true
+}
+
+// handleSystemLogs 处理系统日志请求
+func handleSystemLogs(w http.ResponseWriter, r *http.Request) {
+	if err := ValidateMethod(r, http.MethodGet); err != nil {
+		WriteStandardError(w, "METHOD_NOT_ALLOWED", err.Error(), http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 获取查询参数
+	linesStr := r.URL.Query().Get("lines")
+	lines := 100 // 默认100行
+	if linesStr != "" {
+		if parsedLines, err := strconv.Atoi(linesStr); err == nil && parsedLines > 0 && parsedLines <= 10000 {
+			lines = parsedLines
+		}
+	}
+
+	levelFilter := r.URL.Query().Get("level")
+	searchQuery := r.URL.Query().Get("search")
+
+	// 获取系统日志
+	cfg := config.Get()
+	logFile := filepath.Join(cfg.Logging.LogsDir, "easilypanel5.log")
+
+	logs, err := readSystemLogLines(logFile, lines*2) // 读取更多行用于过滤
+	if err != nil {
+		WriteStandardError(w, "GET_LOGS_FAILED", fmt.Sprintf("Failed to get system logs: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// 解析和过滤日志
+	var logEntries []map[string]interface{}
+	for _, logLine := range logs {
+		entry := parseSystemLogLine(logLine)
+
+		// 应用过滤器
+		if levelFilter != "" && !strings.EqualFold(entry["level"].(string), levelFilter) {
+			continue
+		}
+
+		if searchQuery != "" {
+			message := strings.ToLower(entry["message"].(string))
+			query := strings.ToLower(searchQuery)
+			if !strings.Contains(message, query) {
+				continue
+			}
+		}
+
+		logEntries = append(logEntries, entry)
+
+		// 达到所需行数就停止
+		if len(logEntries) >= lines {
+			break
+		}
+	}
+
+	WriteStandardResponse(w, logEntries)
+}
+
+// parseSystemLogLine 解析系统日志行
+func parseSystemLogLine(line string) map[string]interface{} {
+	// 系统日志格式: 2006-01-02 15:04:05 [LEVEL] message
+	parts := strings.SplitN(line, " ", 4)
+
+	entry := map[string]interface{}{
+		"raw":       line,
+		"message":   line,
+		"level":     "INFO",
+		"timestamp": time.Now().Format("2006-01-02 15:04:05"),
+	}
+
+	if len(parts) >= 4 {
+		// 解析时间戳
+		timestampStr := parts[0] + " " + parts[1]
+		entry["timestamp"] = timestampStr
+
+		// 解析级别
+		if len(parts[2]) > 2 && parts[2][0] == '[' && parts[2][len(parts[2])-1] == ']' {
+			level := parts[2][1 : len(parts[2])-1]
+			entry["level"] = level
+		}
+
+		// 解析消息
+		if len(parts) >= 4 {
+			entry["message"] = parts[3]
+		}
+	}
+
+	return entry
+}
+
+// readSystemLogLines 读取系统日志文件的最后几行
+func readSystemLogLines(filename string, lines int) ([]string, error) {
+	file, err := os.Open(filename)
+	if err != nil {
+		return nil, err
+	}
+	defer file.Close()
+
+	// 获取文件大小
+	stat, err := file.Stat()
+	if err != nil {
+		return nil, err
+	}
+	fileSize := stat.Size()
+
+	if fileSize == 0 {
+		return []string{}, nil
+	}
+
+	// 从文件末尾开始读取
+	const bufferSize = 4096
+	var result []string
+	var buffer []byte
+	var offset int64 = fileSize
+	var lineCount int
+
+	for offset > 0 && lineCount < lines {
+		// 计算读取大小
+		readSize := int64(bufferSize)
+		if offset < readSize {
+			readSize = offset
+		}
+		offset -= readSize
+
+		// 读取数据块
+		chunk := make([]byte, readSize)
+		_, err := file.ReadAt(chunk, offset)
+		if err != nil {
+			return nil, err
+		}
+
+		// 将数据块添加到缓冲区前面
+		buffer = append(chunk, buffer...)
+
+		// 分割行
+		lines := strings.Split(string(buffer), "\n")
+
+		// 如果不是从文件开头开始读取，第一行可能是不完整的
+		if offset > 0 && len(lines) > 0 {
+			// 保留第一行作为下次读取的一部分
+			buffer = []byte(lines[0])
+			lines = lines[1:]
+		} else {
+			buffer = []byte{}
+		}
+
+		// 从后往前添加完整的行
+		for i := len(lines) - 1; i >= 0 && lineCount < lines; i-- {
+			if strings.TrimSpace(lines[i]) != "" {
+				result = append([]string{lines[i]}, result...)
+				lineCount++
+			}
+		}
+	}
+
+	// 限制返回的行数
+	if len(result) > lines {
+		result = result[len(result)-lines:]
+	}
+
+	return result, nil
 }
 
 // handleServerCommand 处理服务器命令请求

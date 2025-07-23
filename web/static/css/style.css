@@ -586,12 +586,15 @@ body {
 
 /* 收缩状态优化 */
 .sidebar:not(.expanded):not(:hover):not(.pinned) .nav-item {
-  padding: 12px 20px;
+  padding: 12px;
   justify-content: center;
   margin: 4px 8px;
   border-radius: 8px;
   border-left: none;
   position: relative;
+  min-height: 48px;
+  display: flex;
+  align-items: center;
 }
 
 .sidebar:not(.expanded):not(:hover):not(.pinned) .nav-item:hover {
@@ -608,6 +611,11 @@ body {
   margin-right: 0;
   font-size: 1.3rem;
   transition: all var(--transition-fast);
+  width: 24px;
+  height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .sidebar:not(.expanded):not(:hover):not(.pinned) .nav-item:hover i {

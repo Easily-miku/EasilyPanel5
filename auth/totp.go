@@ -58,27 +58,57 @@ func (t *TOTPManager) GenerateCode(secret string, timestamp int64) (string, erro
 
 // ValidateCode 验证TOTP验证码
 func (t *TOTPManager) ValidateCode(secret, code string) bool {
-	return t.ValidateCodeWithWindow(secret, code, 1)
+	return t.ValidateCodeWithWindow(secret, code, 2)
 }
 
 // ValidateCodeWithWindow 验证TOTP验证码（带时间窗口）
 func (t *TOTPManager) ValidateCodeWithWindow(secret, code string, window int) bool {
 	now := time.Now().Unix()
-	
-	// 检查当前时间和前后窗口内的验证码
+	currentTimeStep := now / int64(t.period)
+
+	// 检查当前时间步和前后窗口内的验证码
 	for i := -window; i <= window; i++ {
-		timestamp := now + int64(i*t.period)
+		timeStep := currentTimeStep + int64(i)
+		timestamp := timeStep * int64(t.period)
 		expectedCode, err := t.GenerateCode(secret, timestamp)
 		if err != nil {
 			return false
 		}
-		
+
 		if code == expectedCode {
 			return true
 		}
 	}
-	
+
 	return false
+}
+
+// ValidateCodeWithReplayProtection 验证TOTP验证码（带防重放攻击）
+func (t *TOTPManager) ValidateCodeWithReplayProtection(secret, code string, lastUsedTimeStep int64, window int) (bool, int64) {
+	now := time.Now().Unix()
+	currentTimeStep := now / int64(t.period)
+
+	// 检查当前时间步和前后窗口内的验证码
+	for i := -window; i <= window; i++ {
+		timeStep := currentTimeStep + int64(i)
+
+		// 防重放攻击：不允许使用已经使用过的时间步
+		if timeStep <= lastUsedTimeStep {
+			continue
+		}
+
+		timestamp := timeStep * int64(t.period)
+		expectedCode, err := t.GenerateCode(secret, timestamp)
+		if err != nil {
+			continue
+		}
+
+		if code == expectedCode {
+			return true, timeStep
+		}
+	}
+
+	return false, lastUsedTimeStep
 }
 
 // GenerateQRCodeURL 生成QR码URL
@@ -245,4 +275,58 @@ func (g *SimpleQRCodeGenerator) GenerateQRCode(data string, size int) ([]byte, e
 // GetCurrentTOTPCode 获取当前时间的TOTP验证码（用于测试）
 func (t *TOTPManager) GetCurrentTOTPCode(secret string) (string, error) {
 	return t.GenerateCode(secret, time.Now().Unix())
+}
+
+// GetTOTPCodeForTime 获取指定时间的TOTP验证码（用于测试）
+func (t *TOTPManager) GetTOTPCodeForTime(secret string, timestamp int64) (string, error) {
+	return t.GenerateCode(secret, timestamp)
+}
+
+// GetCurrentTimeStep 获取当前时间步（用于调试）
+func (t *TOTPManager) GetCurrentTimeStep() int64 {
+	return time.Now().Unix() / int64(t.period)
+}
+
+// ValidateCodeDebug 验证TOTP验证码（带调试信息）
+func (t *TOTPManager) ValidateCodeDebug(secret, code string) (bool, map[string]interface{}) {
+	now := time.Now().Unix()
+	currentTimeStep := now / int64(t.period)
+
+	debugInfo := map[string]interface{}{
+		"current_time":      now,
+		"current_timestep":  currentTimeStep,
+		"period":           t.period,
+		"window":           2,
+		"tested_codes":     []map[string]interface{}{},
+	}
+
+	// 检查当前时间步和前后窗口内的验证码
+	for i := -2; i <= 2; i++ {
+		timeStep := currentTimeStep + int64(i)
+		timestamp := timeStep * int64(t.period)
+		expectedCode, err := t.GenerateCode(secret, timestamp)
+
+		codeInfo := map[string]interface{}{
+			"timestep":      timeStep,
+			"timestamp":     timestamp,
+			"expected_code": expectedCode,
+			"matches":       code == expectedCode,
+			"error":         nil,
+		}
+
+		if err != nil {
+			codeInfo["error"] = err.Error()
+		}
+
+		debugInfo["tested_codes"] = append(debugInfo["tested_codes"].([]map[string]interface{}), codeInfo)
+
+		if err == nil && code == expectedCode {
+			debugInfo["match_found"] = true
+			debugInfo["match_timestep"] = timeStep
+			return true, debugInfo
+		}
+	}
+
+	debugInfo["match_found"] = false
+	return false, debugInfo
 }

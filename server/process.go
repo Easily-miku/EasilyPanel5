@@ -7,6 +7,8 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
+	"strings"
 	"sync"
 	"time"
 
@@ -16,13 +18,14 @@ import (
 
 // ServerProcess 服务器进程信息
 type ServerProcess struct {
-	Server  *config.MinecraftServer
-	Cmd     *exec.Cmd
-	Stdin   io.WriteCloser
-	Stdout  io.ReadCloser
-	Stderr  io.ReadCloser
-	LogFile *os.File
-	mutex   sync.RWMutex
+	Server      *config.MinecraftServer
+	Cmd         *exec.Cmd
+	Stdin       io.WriteCloser
+	Stdout      io.ReadCloser
+	Stderr      io.ReadCloser
+	LogFile     *os.File
+	lastLogTime []time.Time // 用于日志限流
+	mutex       sync.RWMutex
 }
 
 var (
@@ -235,18 +238,44 @@ func (p *ServerProcess) writeLog(line, source string) {
 	if p.LogFile != nil {
 		timestamp := time.Now().Format("2006-01-02 15:04:05")
 		logLine := fmt.Sprintf("[%s] [%s] %s\n", timestamp, source, line)
+
+		// 检查是否需要轮转日志
+		if p.shouldRotateLog() {
+			p.rotateLog()
+		}
+
 		p.LogFile.WriteString(logLine)
 		p.LogFile.Sync()
 	}
 }
 
-// broadcastLog 广播日志到WebSocket客户端
+// broadcastLog 广播日志到WebSocket客户端（带限流）
 func (p *ServerProcess) broadcastLog(line, level string) {
+	// 简单的限流：检查最近1秒内的日志数量
+	now := time.Now()
+	p.lastLogTime = append(p.lastLogTime, now)
+
+	// 清理1秒前的记录
+	cutoff := now.Add(-time.Second)
+	for len(p.lastLogTime) > 0 && p.lastLogTime[0].Before(cutoff) {
+		p.lastLogTime = p.lastLogTime[1:]
+	}
+
+	// 如果1秒内日志超过100条，跳过广播
+	if len(p.lastLogTime) > 100 {
+		return
+	}
+
+	// 解析日志获取更多信息
+	parsed := utils.ParseMinecraftLog(line)
+
 	utils.EmitEvent("log_message", p.Server.ID, map[string]interface{}{
 		"timestamp": time.Now().Format("2006-01-02T15:04:05Z"),
-		"level":     level,
-		"message":   line,
+		"level":     parsed["level"],
+		"message":   parsed["message"],
 		"raw":       line,
+		"thread":    parsed["thread"],
+		"logger":    parsed["logger"],
 	})
 }
 
@@ -332,7 +361,7 @@ func (p *ServerProcess) cleanup() {
 	}
 }
 
-// readLogLines 读取日志文件的最后几行
+// readLogLines 读取日志文件的最后几行（高效实现）
 func readLogLines(filename string, lines int) ([]string, error) {
 	file, err := os.Open(filename)
 	if err != nil {
@@ -340,23 +369,164 @@ func readLogLines(filename string, lines int) ([]string, error) {
 	}
 	defer file.Close()
 
-	scanner := bufio.NewScanner(file)
-
-	// 简单实现：读取所有行，然后返回最后几行
-	var allLines []string
-	for scanner.Scan() {
-		allLines = append(allLines, scanner.Text())
-	}
-
-	if err := scanner.Err(); err != nil {
+	// 获取文件大小
+	stat, err := file.Stat()
+	if err != nil {
 		return nil, err
 	}
+	fileSize := stat.Size()
 
-	// 返回最后几行
-	start := len(allLines) - lines
-	if start < 0 {
-		start = 0
+	if fileSize == 0 {
+		return []string{}, nil
 	}
 
-	return allLines[start:], nil
+	// 从文件末尾开始读取
+	const bufferSize = 4096
+	var result []string
+	var buffer []byte
+	var offset int64 = fileSize
+	var lineCount int
+
+	for offset > 0 && lineCount < lines {
+		// 计算读取大小
+		readSize := int64(bufferSize)
+		if offset < readSize {
+			readSize = offset
+		}
+		offset -= readSize
+
+		// 读取数据块
+		chunk := make([]byte, readSize)
+		_, err := file.ReadAt(chunk, offset)
+		if err != nil {
+			return nil, err
+		}
+
+		// 将数据块添加到缓冲区前面
+		buffer = append(chunk, buffer...)
+
+		// 分割行
+		lines := strings.Split(string(buffer), "\n")
+
+		// 如果不是从文件开头开始读取，第一行可能是不完整的
+		if offset > 0 && len(lines) > 0 {
+			// 保留第一行作为下次读取的一部分
+			buffer = []byte(lines[0])
+			lines = lines[1:]
+		} else {
+			buffer = []byte{}
+		}
+
+		// 从后往前添加完整的行
+		for i := len(lines) - 1; i >= 0 && lineCount < lines; i-- {
+			if strings.TrimSpace(lines[i]) != "" {
+				result = append([]string{lines[i]}, result...)
+				lineCount++
+			}
+		}
+	}
+
+	// 限制返回的行数
+	if len(result) > lines {
+		result = result[len(result)-lines:]
+	}
+
+	return result, nil
+}
+
+// parseLogLine 解析日志行，提取时间戳和级别
+func parseLogLine(line string) map[string]interface{} {
+	// 使用utils包中的解析函数
+	return utils.ParseMinecraftLog(line)
+}
+
+// shouldRotateLog 检查是否需要轮转日志
+func (p *ServerProcess) shouldRotateLog() bool {
+	if p.LogFile == nil {
+		return false
+	}
+
+	// 获取配置
+	cfg := config.Get()
+	if !cfg.Daemon.LogRotation {
+		return false
+	}
+
+	// 检查文件大小
+	stat, err := p.LogFile.Stat()
+	if err != nil {
+		return false
+	}
+
+	return stat.Size() > cfg.Daemon.MaxLogSize
+}
+
+// rotateLog 轮转日志文件
+func (p *ServerProcess) rotateLog() {
+	if p.LogFile == nil {
+		return
+	}
+
+	cfg := config.Get()
+	logDir := filepath.Join(p.Server.WorkDir, "logs")
+
+	// 关闭当前日志文件
+	p.LogFile.Close()
+
+	// 重命名当前日志文件
+	currentLogPath := filepath.Join(logDir, "latest.log")
+	timestamp := time.Now().Format("2006-01-02-15-04-05")
+	archivedLogPath := filepath.Join(logDir, fmt.Sprintf("server-%s.log", timestamp))
+
+	if err := os.Rename(currentLogPath, archivedLogPath); err != nil {
+		fmt.Printf("Failed to rotate log file: %v\n", err)
+	}
+
+	// 创建新的日志文件
+	newLogFile, err := os.OpenFile(
+		currentLogPath,
+		os.O_CREATE|os.O_WRONLY|os.O_APPEND,
+		0644,
+	)
+	if err != nil {
+		fmt.Printf("Failed to create new log file: %v\n", err)
+		return
+	}
+
+	p.LogFile = newLogFile
+
+	// 清理旧日志文件
+	go p.cleanupOldLogs(logDir, cfg.Daemon.MaxLogFiles)
+}
+
+// cleanupOldLogs 清理旧的日志文件
+func (p *ServerProcess) cleanupOldLogs(logDir string, maxFiles int) {
+	entries, err := os.ReadDir(logDir)
+	if err != nil {
+		return
+	}
+
+	// 过滤出日志文件并按修改时间排序
+	var logFiles []os.FileInfo
+	for _, entry := range entries {
+		if strings.HasPrefix(entry.Name(), "server-") && strings.HasSuffix(entry.Name(), ".log") {
+			info, err := entry.Info()
+			if err == nil {
+				logFiles = append(logFiles, info)
+			}
+		}
+	}
+
+	// 按修改时间排序（最新的在前）
+	sort.Slice(logFiles, func(i, j int) bool {
+		return logFiles[i].ModTime().After(logFiles[j].ModTime())
+	})
+
+	// 删除超出限制的文件
+	for i := maxFiles; i < len(logFiles); i++ {
+		filePath := filepath.Join(logDir, logFiles[i].Name())
+		if err := os.Remove(filePath); err != nil {
+			fmt.Printf("Failed to remove old log file %s: %v\n", filePath, err)
+		}
+	}
 }

@@ -22,6 +22,7 @@ type User struct {
 	TwoFactorSecret  string    `json:"two_factor_secret"`
 	BackupCodes      []string  `json:"backup_codes"`
 	TwoFactorSetupAt *time.Time `json:"two_factor_setup_at"`
+	LastTOTPTimeStep int64     `json:"last_totp_time_step"` // 防重放攻击
 	
 	// 安全相关
 	FailedLoginAttempts int       `json:"failed_login_attempts"`

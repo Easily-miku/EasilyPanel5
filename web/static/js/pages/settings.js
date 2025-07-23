@@ -748,18 +748,24 @@ class SettingsPageManager {
     async loadSettings() {
         try {
             const response = await fetch('/api/settings');
+
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+
             const result = await response.json();
 
-            if (response.ok && result.success) {
+            if (result.success) {
                 this.settings = result.data || {};
                 this.populateForm();
+                this.hideError();
             } else {
                 const errorMessage = result.message || result.error || '加载设置失败';
                 this.showError(errorMessage);
             }
         } catch (error) {
             console.error('Failed to load settings:', error);
-            this.showError('网络错误，请重试');
+            this.showError(`网络错误: ${error.message}`);
         }
     }
     
@@ -838,6 +844,11 @@ class SettingsPageManager {
     showError(message) {
         const uiManager = window.getUIManager();
         uiManager?.showNotification('错误', message, 'error');
+    }
+
+    // 隐藏错误信息
+    hideError() {
+        // 错误信息通过通知系统显示，会自动消失
     }
 }
 

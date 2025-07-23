@@ -38,6 +38,9 @@ func (h *AuthHandlers) RegisterRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("/api/auth/password/change", h.handleChangePassword)
 	mux.HandleFunc("/api/auth/profile", h.handleProfile)
 	mux.HandleFunc("/api/auth/security-logs", h.handleSecurityLogs)
+
+	// 调试接口（仅在开发环境启用）
+	mux.HandleFunc("/api/auth/totp/debug", h.handleTOTPDebug)
 }
 
 // handleLogin 处理登录
@@ -582,5 +585,46 @@ func (h *AuthHandlers) AuthMiddleware(next http.Handler) http.Handler {
 		r.Header.Set("X-User-Role", user.Role)
 
 		next.ServeHTTP(w, r)
+	})
+}
+
+// handleTOTPDebug 处理TOTP调试（仅用于开发调试）
+func (h *AuthHandlers) handleTOTPDebug(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	user, err := h.requireAuth(w, r, "")
+	if err != nil {
+		return
+	}
+
+	if !user.TwoFactorEnabled {
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": false,
+			"message": "Two-factor authentication is not enabled",
+		})
+		return
+	}
+
+	var req struct {
+		Code string `json:"code"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// 使用调试方法验证TOTP
+	valid, debugInfo := h.service.totpManager.ValidateCodeDebug(user.TwoFactorSecret, req.Code)
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success":    true,
+		"valid":      valid,
+		"debug_info": debugInfo,
 	})
 }
