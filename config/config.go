@@ -82,6 +82,30 @@ func getDefaultConfig() *AppConfig {
 			MaxAge:       7,
 			EnableColors: true,
 		},
+		Daemon: DaemonConfig{
+			EnableAutoRestart:   true,
+			MaxRestartAttempts:  3,
+			RestartDelay:        5 * time.Second,
+			CrashDetectionDelay: 3 * time.Second,
+			ResourceMonitoring:  true,
+			MonitorInterval:     30 * time.Second,
+			LogRotation:         true,
+			MaxLogSize:          50 * 1024 * 1024, // 50MB
+			MaxLogFiles:         10,
+		},
+		FRP: FRPConfig{
+			Enabled:            false,
+			APIEndpoint:        "https://api.openfrp.net",
+			DefaultNode:        "",
+			AutoStart:          false,
+			AutoRestart:        true,
+			MaxTunnels:         10,
+			MonitorInterval:    30 * time.Second,
+			StatsRetention:     24 * time.Hour,
+			DefaultBandwidth:   1024, // 1MB/s
+			DefaultCompression: true,
+			DefaultEncryption:  false,
+		},
 	}
 }
 

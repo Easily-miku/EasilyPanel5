@@ -13,12 +13,14 @@ import (
 	"easilypanel5/api"
 	"easilypanel5/config"
 	"easilypanel5/core"
+	"easilypanel5/frp"
+	"easilypanel5/server"
 )
 
 const (
 	DefaultPort = "8080"
 	AppName     = "EasilyPanel5"
-	Version     = "1.0.1"
+	Version     = "1.1.0"
 )
 
 func main() {
@@ -38,6 +40,20 @@ func main() {
 	// 初始化下载管理器
 	core.InitDownloadManager()
 
+	// 启动进程守护管理器
+	daemon := server.GetDaemon()
+	if err := daemon.Start(); err != nil {
+		log.Printf("Failed to start daemon: %v", err)
+	}
+
+	// 启动FRP管理器（如果启用）
+	cfg := config.Get()
+	if cfg.FRP.Enabled {
+		if err := frp.StartManager(); err != nil {
+			log.Printf("Failed to start FRP manager: %v", err)
+		}
+	}
+
 	// 创建必要的目录
 	if err := createDirectories(); err != nil {
 		log.Fatalf("Failed to create directories: %v", err)
@@ -53,7 +69,7 @@ func main() {
 	}
 
 	// 创建HTTP服务器
-	server := &http.Server{
+	httpServer := &http.Server{
 		Addr:         ":" + port,
 		Handler:      router,
 		ReadTimeout:  15 * time.Second,
@@ -64,7 +80,7 @@ func main() {
 	// 启动服务器
 	go func() {
 		fmt.Printf("Server starting on http://localhost:%s\n", port)
-		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err := httpServer.ListenAndServe(); err != nil && err != http.ErrServerClosed {
 			log.Fatalf("Server failed to start: %v", err)
 		}
 	}()
@@ -76,11 +92,22 @@ func main() {
 
 	fmt.Println("\nShutting down server...")
 
+	// 停止FRP管理器
+	if err := frp.StopManager(); err != nil {
+		log.Printf("Failed to stop FRP manager: %v", err)
+	}
+
+	// 停止守护管理器
+	daemon = server.GetDaemon()
+	if err := daemon.Stop(); err != nil {
+		log.Printf("Failed to stop daemon: %v", err)
+	}
+
 	// 优雅关闭
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
-	if err := server.Shutdown(ctx); err != nil {
+	if err := httpServer.Shutdown(ctx); err != nil {
 		log.Fatalf("Server forced to shutdown: %v", err)
 	}
 

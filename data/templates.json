@@ -1,0 +1,87 @@
+{
+  "fabric_latest": {
+    "id": "fabric_latest",
+    "name": "Fabric Latest",
+    "description": "最新版本的Fabric模组服务器",
+    "core_type": "fabric",
+    "mc_version": "1.20.1",
+    "memory": 3072,
+    "java_args": [
+      "-Xms1G",
+      "-Xmx3G",
+      "-XX:+UseG1GC"
+    ],
+    "properties": {
+      "difficulty": "normal",
+      "gamemode": "survival",
+      "max-players": "30",
+      "online-mode": "true",
+      "pvp": "true",
+      "server-port": "25565",
+      "white-list": "false"
+    },
+    "plugins": null,
+    "mods": null,
+    "config": null,
+    "created_at": "2025-07-23T14:38:31.995714655+08:00",
+    "updated_at": "2025-07-23T14:38:31.995714781+08:00",
+    "is_default": true
+  },
+  "paper_latest": {
+    "id": "paper_latest",
+    "name": "Paper Latest",
+    "description": "最新版本的Paper服务器（高性能）",
+    "core_type": "paper",
+    "mc_version": "1.20.1",
+    "memory": 2048,
+    "java_args": [
+      "-Xms1G",
+      "-Xmx2G",
+      "-XX:+UseG1GC",
+      "-XX:+ParallelRefProcEnabled"
+    ],
+    "properties": {
+      "difficulty": "normal",
+      "gamemode": "survival",
+      "max-players": "50",
+      "online-mode": "true",
+      "pvp": "true",
+      "server-port": "25565",
+      "white-list": "false"
+    },
+    "plugins": null,
+    "mods": null,
+    "config": null,
+    "created_at": "2025-07-23T14:38:31.995714271+08:00",
+    "updated_at": "2025-07-23T14:38:31.995714509+08:00",
+    "is_default": true
+  },
+  "vanilla_latest": {
+    "id": "vanilla_latest",
+    "name": "Vanilla Latest",
+    "description": "最新版本的原版Minecraft服务器",
+    "core_type": "vanilla",
+    "mc_version": "1.20.1",
+    "memory": 2048,
+    "java_args": [
+      "-Xms1G",
+      "-Xmx2G",
+      "-XX:+UseG1GC"
+    ],
+    "properties": {
+      "difficulty": "normal",
+      "gamemode": "survival",
+      "max-players": "20",
+      "online-mode": "true",
+      "pvp": "true",
+      "server-port": "25565",
+      "white-list": "false"
+    },
+    "plugins": null,
+    "mods": null,
+    "config": null,
+    "created_at": "2025-07-23T14:38:31.995713982+08:00",
+    "updated_at": "2025-07-23T14:38:31.99571415+08:00",
+    "is_default": true
+  }
+}

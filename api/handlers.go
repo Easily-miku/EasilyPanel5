@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"easilypanel5/config"
+	"easilypanel5/frp"
 	"easilypanel5/server"
 )
 
@@ -277,6 +278,404 @@ func handleServerDetail(w http.ResponseWriter, r *http.Request) {
 		} else {
 			writeErrorResponse(w, "Invalid action", http.StatusBadRequest)
 		}
+
+	default:
+		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleDaemonStatus 处理守护管理器状态查询
+func handleDaemonStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	cfg := config.Get()
+
+	response := map[string]interface{}{
+		"enabled":              cfg.Daemon.EnableAutoRestart,
+		"max_restart_attempts": cfg.Daemon.MaxRestartAttempts,
+		"restart_delay_ms":     cfg.Daemon.RestartDelay.Milliseconds(),
+		"resource_monitoring":  cfg.Daemon.ResourceMonitoring,
+		"monitor_interval_ms":  cfg.Daemon.MonitorInterval.Milliseconds(),
+		"log_rotation":         cfg.Daemon.LogRotation,
+		"max_log_size":         cfg.Daemon.MaxLogSize,
+		"max_log_files":        cfg.Daemon.MaxLogFiles,
+	}
+
+	writeJSONResponse(w, response)
+}
+
+// handleDaemonStats 处理守护统计信息查询
+func handleDaemonStats(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	daemon := server.GetDaemon()
+	stats := daemon.GetAllProcessStats()
+
+	writeJSONResponse(w, stats)
+}
+
+// handleFRPStatus 处理FRP状态查询
+func handleFRPStatus(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	cfg := config.Get()
+
+	response := map[string]interface{}{
+		"enabled":             cfg.FRP.Enabled,
+		"api_endpoint":        cfg.FRP.APIEndpoint,
+		"default_node":        cfg.FRP.DefaultNode,
+		"auto_start":          cfg.FRP.AutoStart,
+		"auto_restart":        cfg.FRP.AutoRestart,
+		"max_tunnels":         cfg.FRP.MaxTunnels,
+		"monitor_interval_ms": cfg.FRP.MonitorInterval.Milliseconds(),
+		"stats_retention_ms":  cfg.FRP.StatsRetention.Milliseconds(),
+		"default_bandwidth":   cfg.FRP.DefaultBandwidth,
+		"default_compression": cfg.FRP.DefaultCompression,
+		"default_encryption":  cfg.FRP.DefaultEncryption,
+		"is_running":          frp.IsManagerRunning(),
+	}
+
+	writeJSONResponse(w, response)
+}
+
+// handleFRPNodes 处理FRP节点查询
+func handleFRPNodes(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	nodes, err := frp.GetNodes()
+	if err != nil {
+		writeErrorResponse(w, fmt.Sprintf("Failed to get nodes: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	writeJSONResponse(w, nodes)
+}
+
+// handleFRPTunnels 处理FRP隧道列表
+func handleFRPTunnels(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		tunnels, err := frp.GetAllTunnels()
+		if err != nil {
+			writeErrorResponse(w, fmt.Sprintf("Failed to get tunnels: %v", err), http.StatusInternalServerError)
+			return
+		}
+		writeJSONResponse(w, tunnels)
+
+	case http.MethodPost:
+		var req frp.TunnelRequest
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErrorResponse(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		// 验证必要字段
+		if req.Name == "" || req.Type == "" || req.Token == "" {
+			writeErrorResponse(w, "Missing required fields", http.StatusBadRequest)
+			return
+		}
+
+		tunnel, err := frp.CreateTunnel(&req)
+		if err != nil {
+			writeErrorResponse(w, fmt.Sprintf("Failed to create tunnel: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		writeJSONResponse(w, tunnel)
+
+	default:
+		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleFRPTunnelAction 处理单个FRP隧道操作
+func handleFRPTunnelAction(w http.ResponseWriter, r *http.Request) {
+	// 从URL路径中提取隧道ID
+	urlPath := strings.TrimPrefix(r.URL.Path, "/api/frp/tunnels/")
+	parts := strings.Split(urlPath, "/")
+	if len(parts) == 0 || parts[0] == "" {
+		writeErrorResponse(w, "Missing tunnel ID", http.StatusBadRequest)
+		return
+	}
+
+	tunnelID := parts[0]
+	action := ""
+	if len(parts) > 1 {
+		action = parts[1]
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		if action == "" {
+			// 获取隧道详情
+			tunnel, err := frp.GetTunnel(tunnelID)
+			if err != nil {
+				writeErrorResponse(w, fmt.Sprintf("Failed to get tunnel: %v", err), http.StatusNotFound)
+				return
+			}
+			writeJSONResponse(w, tunnel)
+		} else if action == "stats" {
+			// 获取隧道统计
+			stats, err := frp.GetTunnelStats(tunnelID)
+			if err != nil {
+				writeErrorResponse(w, fmt.Sprintf("Failed to get tunnel stats: %v", err), http.StatusInternalServerError)
+				return
+			}
+			writeJSONResponse(w, stats)
+		} else {
+			writeErrorResponse(w, "Invalid action", http.StatusBadRequest)
+		}
+
+	case http.MethodPost:
+		switch action {
+		case "start":
+			if err := frp.StartTunnel(tunnelID); err != nil {
+				writeErrorResponse(w, fmt.Sprintf("Failed to start tunnel: %v", err), http.StatusInternalServerError)
+				return
+			}
+			writeJSONResponse(w, map[string]string{"status": "starting"})
+
+		case "stop":
+			if err := frp.StopTunnel(tunnelID); err != nil {
+				writeErrorResponse(w, fmt.Sprintf("Failed to stop tunnel: %v", err), http.StatusInternalServerError)
+				return
+			}
+			writeJSONResponse(w, map[string]string{"status": "stopping"})
+
+		case "restart":
+			if err := frp.RestartTunnel(tunnelID); err != nil {
+				writeErrorResponse(w, fmt.Sprintf("Failed to restart tunnel: %v", err), http.StatusInternalServerError)
+				return
+			}
+			writeJSONResponse(w, map[string]string{"status": "restarting"})
+
+		default:
+			writeErrorResponse(w, "Invalid action", http.StatusBadRequest)
+		}
+
+	case http.MethodDelete:
+		if action == "" {
+			// 删除隧道
+			if err := frp.DeleteTunnel(tunnelID); err != nil {
+				writeErrorResponse(w, fmt.Sprintf("Failed to delete tunnel: %v", err), http.StatusInternalServerError)
+				return
+			}
+			writeJSONResponse(w, map[string]string{"status": "deleted"})
+		} else {
+			writeErrorResponse(w, "Invalid action", http.StatusBadRequest)
+		}
+
+	default:
+		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleTemplates 处理模板列表
+func handleTemplates(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		templates := server.GetTemplateManager().GetAllTemplates()
+		writeJSONResponse(w, templates)
+
+	case http.MethodPost:
+		var template config.ServerTemplate
+		if err := json.NewDecoder(r.Body).Decode(&template); err != nil {
+			writeErrorResponse(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		if err := server.GetTemplateManager().CreateTemplate(&template); err != nil {
+			writeErrorResponse(w, fmt.Sprintf("Failed to create template: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		writeJSONResponse(w, template)
+
+	default:
+		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleTemplateAction 处理单个模板操作
+func handleTemplateAction(w http.ResponseWriter, r *http.Request) {
+	templateID := strings.TrimPrefix(r.URL.Path, "/api/templates/")
+	if templateID == "" {
+		writeErrorResponse(w, "Missing template ID", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		template, err := server.GetTemplateManager().GetTemplate(templateID)
+		if err != nil {
+			writeErrorResponse(w, fmt.Sprintf("Template not found: %v", err), http.StatusNotFound)
+			return
+		}
+		writeJSONResponse(w, template)
+
+	case http.MethodPut:
+		var template config.ServerTemplate
+		if err := json.NewDecoder(r.Body).Decode(&template); err != nil {
+			writeErrorResponse(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		template.ID = templateID
+		if err := server.GetTemplateManager().UpdateTemplate(&template); err != nil {
+			writeErrorResponse(w, fmt.Sprintf("Failed to update template: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		writeJSONResponse(w, template)
+
+	case http.MethodDelete:
+		if err := server.GetTemplateManager().DeleteTemplate(templateID); err != nil {
+			writeErrorResponse(w, fmt.Sprintf("Failed to delete template: %v", err), http.StatusInternalServerError)
+			return
+		}
+		writeJSONResponse(w, map[string]string{"status": "deleted"})
+
+	default:
+		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleGroups 处理分组列表
+func handleGroups(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		groups := server.GetGroupManager().GetAllGroups()
+		writeJSONResponse(w, groups)
+
+	case http.MethodPost:
+		var group config.ServerGroup
+		if err := json.NewDecoder(r.Body).Decode(&group); err != nil {
+			writeErrorResponse(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		if err := server.GetGroupManager().CreateGroup(&group); err != nil {
+			writeErrorResponse(w, fmt.Sprintf("Failed to create group: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		writeJSONResponse(w, group)
+
+	default:
+		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleGroupAction 处理单个分组操作
+func handleGroupAction(w http.ResponseWriter, r *http.Request) {
+	groupID := strings.TrimPrefix(r.URL.Path, "/api/groups/")
+	if groupID == "" {
+		writeErrorResponse(w, "Missing group ID", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		group, err := server.GetGroupManager().GetGroup(groupID)
+		if err != nil {
+			writeErrorResponse(w, fmt.Sprintf("Group not found: %v", err), http.StatusNotFound)
+			return
+		}
+		writeJSONResponse(w, group)
+
+	case http.MethodPut:
+		var group config.ServerGroup
+		if err := json.NewDecoder(r.Body).Decode(&group); err != nil {
+			writeErrorResponse(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		group.ID = groupID
+		if err := server.GetGroupManager().UpdateGroup(&group); err != nil {
+			writeErrorResponse(w, fmt.Sprintf("Failed to update group: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		writeJSONResponse(w, group)
+
+	case http.MethodDelete:
+		if err := server.GetGroupManager().DeleteGroup(groupID); err != nil {
+			writeErrorResponse(w, fmt.Sprintf("Failed to delete group: %v", err), http.StatusInternalServerError)
+			return
+		}
+		writeJSONResponse(w, map[string]string{"status": "deleted"})
+
+	default:
+		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleBatchOperations 处理批量操作
+func handleBatchOperations(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		operations := server.GetBatchManager().GetAllBatchOperations()
+		writeJSONResponse(w, operations)
+
+	case http.MethodPost:
+		var req struct {
+			Type      string   `json:"type"`
+			ServerIDs []string `json:"server_ids"`
+		}
+
+		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+			writeErrorResponse(w, "Invalid JSON", http.StatusBadRequest)
+			return
+		}
+
+		operation, err := server.GetBatchManager().StartBatchOperation(req.Type, req.ServerIDs)
+		if err != nil {
+			writeErrorResponse(w, fmt.Sprintf("Failed to start batch operation: %v", err), http.StatusInternalServerError)
+			return
+		}
+
+		writeJSONResponse(w, operation)
+
+	default:
+		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// handleBatchAction 处理单个批量操作
+func handleBatchAction(w http.ResponseWriter, r *http.Request) {
+	operationID := strings.TrimPrefix(r.URL.Path, "/api/batch/")
+	if operationID == "" {
+		writeErrorResponse(w, "Missing operation ID", http.StatusBadRequest)
+		return
+	}
+
+	switch r.Method {
+	case http.MethodGet:
+		operation, err := server.GetBatchManager().GetBatchOperation(operationID)
+		if err != nil {
+			writeErrorResponse(w, fmt.Sprintf("Operation not found: %v", err), http.StatusNotFound)
+			return
+		}
+		writeJSONResponse(w, operation)
+
+	case http.MethodDelete:
+		if err := server.GetBatchManager().CancelBatchOperation(operationID); err != nil {
+			writeErrorResponse(w, fmt.Sprintf("Failed to cancel operation: %v", err), http.StatusInternalServerError)
+			return
+		}
+		writeJSONResponse(w, map[string]string{"status": "cancelled"})
 
 	default:
 		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)

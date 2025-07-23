@@ -7,11 +7,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"runtime"
-	"strconv"
-	"strings"
 	"sync"
-	"syscall"
 	"time"
 
 	"easilypanel5/config"
@@ -35,13 +31,13 @@ var (
 )
 
 // startServerProcess 启动服务器进程
-func startServerProcess(server *config.MinecraftServer) error {
+func startServerProcess(server *config.MinecraftServer) (*ServerProcess, error) {
 	processMutex.Lock()
 	defer processMutex.Unlock()
 
 	// 检查是否已经在运行
 	if _, exists := runningProcesses[server.ID]; exists {
-		return fmt.Errorf("server process already running")
+		return nil, fmt.Errorf("server process already running")
 	}
 
 	// 构建启动命令
@@ -55,26 +51,26 @@ func startServerProcess(server *config.MinecraftServer) error {
 	// 创建管道
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
-		return fmt.Errorf("failed to create stdin pipe: %v", err)
+		return nil, fmt.Errorf("failed to create stdin pipe: %v", err)
 	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
 		stdin.Close()
-		return fmt.Errorf("failed to create stdout pipe: %v", err)
+		return nil, fmt.Errorf("failed to create stdout pipe: %v", err)
 	}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
 		stdin.Close()
 		stdout.Close()
-		return fmt.Errorf("failed to create stderr pipe: %v", err)
+		return nil, fmt.Errorf("failed to create stderr pipe: %v", err)
 	}
 
 	// 创建日志文件
 	logDir := filepath.Join(server.WorkDir, "logs")
 	if err := os.MkdirAll(logDir, 0755); err != nil {
-		return fmt.Errorf("failed to create log directory: %v", err)
+		return nil, fmt.Errorf("failed to create log directory: %v", err)
 	}
 
 	logFile, err := os.OpenFile(
@@ -86,7 +82,7 @@ func startServerProcess(server *config.MinecraftServer) error {
 		stdin.Close()
 		stdout.Close()
 		stderr.Close()
-		return fmt.Errorf("failed to create log file: %v", err)
+		return nil, fmt.Errorf("failed to create log file: %v", err)
 	}
 
 	// 启动进程
@@ -95,7 +91,7 @@ func startServerProcess(server *config.MinecraftServer) error {
 		stdout.Close()
 		stderr.Close()
 		logFile.Close()
-		return fmt.Errorf("failed to start process: %v", err)
+		return nil, fmt.Errorf("failed to start process: %v", err)
 	}
 
 	// 更新服务器信息
@@ -119,7 +115,7 @@ func startServerProcess(server *config.MinecraftServer) error {
 	go process.handleLogs()
 	go process.monitorProcess()
 
-	return nil
+	return process, nil
 }
 
 // stopServerProcess 停止服务器进程
@@ -179,30 +175,6 @@ func sendCommandToProcess(server *config.MinecraftServer, command string) error 
 	return process.sendCommand(command)
 }
 
-// isProcessRunning 检查进程是否在运行
-func isProcessRunning(pid int) bool {
-	if pid <= 0 {
-		return false
-	}
-
-	if runtime.GOOS == "windows" {
-		// Windows: 尝试打开进程句柄
-		cmd := exec.Command("tasklist", "/FI", fmt.Sprintf("PID eq %d", pid))
-		output, err := cmd.Output()
-		if err != nil {
-			return false
-		}
-		return strings.Contains(string(output), strconv.Itoa(pid))
-	} else {
-		// Unix-like: 发送信号0检查进程是否存在
-		process, err := os.FindProcess(pid)
-		if err != nil {
-			return false
-		}
-		err = process.Signal(syscall.Signal(0))
-		return err == nil
-	}
-}
 
 // buildJavaArgs 构建Java启动参数
 func buildJavaArgs(server *config.MinecraftServer) []string {
@@ -311,7 +283,7 @@ func (p *ServerProcess) monitorProcess() {
 	// 如果启用了自动重启
 	if p.Server.AutoRestart {
 		time.Sleep(5 * time.Second) // 等待5秒后重启
-		if err := startServerProcess(p.Server); err != nil {
+		if _, err := startServerProcess(p.Server); err != nil {
 			// 重启失败，记录错误
 			utils.EmitEvent("log_message", p.Server.ID, map[string]interface{}{
 				"timestamp": time.Now().Format("2006-01-02T15:04:05Z"),

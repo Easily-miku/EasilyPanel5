@@ -31,5 +31,29 @@
     "max_files": 5,
     "max_age": 7,
     "enable_colors": true
+  },
+  "daemon": {
+    "enable_auto_restart": true,
+    "max_restart_attempts": 3,
+    "restart_delay": 5000000000,
+    "crash_detection_delay": 3000000000,
+    "resource_monitoring": true,
+    "monitor_interval": 30000000000,
+    "log_rotation": true,
+    "max_log_size": 52428800,
+    "max_log_files": 10
+  },
+  "frp": {
+    "enabled": false,
+    "api_endpoint": "https://api.openfrp.net",
+    "default_node": "",
+    "auto_start": false,
+    "auto_restart": true,
+    "max_tunnels": 10,
+    "monitor_interval": 30000000000,
+    "stats_retention": 86400000000000,
+    "default_bandwidth": 1024,
+    "default_compression": true,
+    "default_encryption": false
   }
 }

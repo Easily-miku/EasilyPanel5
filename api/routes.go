@@ -30,6 +30,24 @@ func SetupRoutes() *http.ServeMux {
 	// 服务器管理相关
 	mux.HandleFunc("/api/servers", handleServers)
 	mux.HandleFunc("/api/servers/", handleServerDetail)
+
+	// 守护管理
+	mux.HandleFunc("/api/daemon/status", handleDaemonStatus)
+	mux.HandleFunc("/api/daemon/stats", handleDaemonStats)
+
+	// FRP管理
+	mux.HandleFunc("/api/frp/status", handleFRPStatus)
+	mux.HandleFunc("/api/frp/nodes", handleFRPNodes)
+	mux.HandleFunc("/api/frp/tunnels", handleFRPTunnels)
+	mux.HandleFunc("/api/frp/tunnels/", handleFRPTunnelAction)
+
+	// 实例管理增强
+	mux.HandleFunc("/api/templates", handleTemplates)
+	mux.HandleFunc("/api/templates/", handleTemplateAction)
+	mux.HandleFunc("/api/groups", handleGroups)
+	mux.HandleFunc("/api/groups/", handleGroupAction)
+	mux.HandleFunc("/api/batch", handleBatchOperations)
+	mux.HandleFunc("/api/batch/", handleBatchAction)
 	
 	// WebSocket
 	mux.HandleFunc("/ws", ServeWS)

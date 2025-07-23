@@ -141,10 +141,17 @@ func StartServer(serverID string) error {
 	config.GetServers().Update(server)
 	
 	// 启动服务器进程
-	if err := startServerProcess(server); err != nil {
+	process, err := startServerProcess(server)
+	if err != nil {
 		server.Status = config.StatusCrashed
 		config.GetServers().Update(server)
 		return fmt.Errorf("failed to start server process: %v", err)
+	}
+
+	// 注册到守护管理器
+	if server.DaemonEnabled {
+		daemon := GetDaemon()
+		daemon.RegisterProcess(serverID, process, server)
 	}
 	
 	return nil
@@ -232,7 +239,10 @@ func GetServerStatus(serverID string) (interface{}, bool) {
 	
 	// 检查进程状态
 	if server.Status == config.StatusRunning && server.PID > 0 {
-		if !isProcessRunning(server.PID) {
+		// 使用守护管理器检查进程状态
+		daemon := GetDaemon()
+		stats := daemon.GetProcessStats(serverID)
+		if stats == nil || stats.PID != server.PID {
 			// 进程已停止，更新状态
 			server.Status = config.StatusCrashed
 			now := time.Now()
