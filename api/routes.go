@@ -3,8 +3,6 @@ package api
 import (
 	"net/http"
 	"path/filepath"
-
-	"github.com/gorilla/websocket"
 )
 
 // SetupRoutes 设置路由
@@ -34,7 +32,7 @@ func SetupRoutes() *http.ServeMux {
 	mux.HandleFunc("/api/servers/", handleServerDetail)
 	
 	// WebSocket
-	mux.HandleFunc("/ws", handleWebSocket)
+	mux.HandleFunc("/ws", ServeWS)
 
 	return mux
 }
@@ -66,25 +64,7 @@ func handleStatus(w http.ResponseWriter, r *http.Request) {
 	writeJSONResponse(w, response)
 }
 
-// WebSocket升级器
-var upgrader = websocket.Upgrader{
-	CheckOrigin: func(r *http.Request) bool {
-		return true // 在生产环境中应该检查origin
-	},
-}
 
-// handleWebSocket 处理WebSocket连接
-func handleWebSocket(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		http.Error(w, "Failed to upgrade to WebSocket", http.StatusBadRequest)
-		return
-	}
-	defer conn.Close()
-
-	// 处理WebSocket连接
-	handleWSConnection(conn)
-}
 
 // writeJSONResponse 写入JSON响应
 func writeJSONResponse(w http.ResponseWriter, data interface{}) {

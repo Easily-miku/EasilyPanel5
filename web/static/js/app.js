@@ -11,32 +11,64 @@ class EasilyPanel {
     }
     
     async init() {
-        // 初始化WebSocket
-        this.wsManager = initWebSocket();
-        this.setupWebSocketHandlers();
-        
+        console.log('开始初始化EasilyPanel...');
+
         // 初始化UI
         this.setupTabNavigation();
         this.setupModals();
         this.setupEventHandlers();
-        
+
         // 加载初始数据
         await this.loadInitialData();
-        
+
+        // 初始化WebSocket管理器
+        console.log('初始化WebSocket管理器...');
+        this.wsManager = initWebSocket();
+        this.setupWebSocketHandlers();
+
+        // 延迟启动WebSocket连接
+        setTimeout(() => {
+            this.startWebSocketIfNeeded();
+        }, 2000);
+
         console.log('EasilyPanel初始化完成');
+    }
+
+    // 启动WebSocket连接（如果需要）
+    startWebSocketIfNeeded() {
+        if (!this.wsManager) {
+            console.log('初始化WebSocket管理器...');
+            this.wsManager = initWebSocket();
+            this.setupWebSocketHandlers();
+        }
+
+        if (this.wsManager.getState() === WS_STATES.DISCONNECTED) {
+            console.log('启动WebSocket连接');
+            this.wsManager.connect();
+        }
     }
     
     setupWebSocketHandlers() {
-        this.wsManager.on('connected', () => {
-            this.showNotification('WebSocket连接已建立', 'success');
+        if (!this.wsManager) return;
+
+        this.wsManager.on('connected', (data) => {
+            console.log('WebSocket连接已建立');
+            // 只在重连成功时显示通知
+            if (data && data.reconnected) {
+                this.showNotification('连接已恢复', 'success');
+            }
         });
-        
-        this.wsManager.on('disconnected', () => {
-            this.showNotification('WebSocket连接已断开', 'warning');
+
+        this.wsManager.on('disconnected', (data) => {
+            console.log('WebSocket连接已断开:', data);
+            // 只在意外断开且之前已连接时显示警告
+            if (data && data.wasConnected && data.code !== 1000 && data.code !== 1001) {
+                this.showNotification('连接已断开，正在重连...', 'warning');
+            }
         });
-        
-        this.wsManager.on('reconnect_failed', () => {
-            this.showNotification('WebSocket重连失败', 'error');
+
+        this.wsManager.on('reconnect_failed', (data) => {
+            this.showNotification(`连接失败 (${data.attempts}次重试)，请检查网络或刷新页面`, 'error');
         });
         
         this.wsManager.on('log_message', (message) => {
@@ -63,15 +95,18 @@ class EasilyPanel {
         tabButtons.forEach(button => {
             button.addEventListener('click', () => {
                 const tabId = button.dataset.tab;
-                
+
+                // 启动WebSocket连接（如果还没有连接）
+                this.startWebSocketIfNeeded();
+
                 // 更新按钮状态
                 tabButtons.forEach(btn => btn.classList.remove('active'));
                 button.classList.add('active');
-                
+
                 // 更新内容显示
                 tabContents.forEach(content => content.classList.remove('active'));
                 document.getElementById(tabId).classList.add('active');
-                
+
                 this.currentTab = tabId;
                 this.onTabChanged(tabId);
             });
@@ -948,6 +983,13 @@ let app = null;
 
 // 页面加载完成后初始化应用
 document.addEventListener('DOMContentLoaded', () => {
+    // 防止重复初始化
+    if (app) {
+        console.log('应用已存在，跳过重复初始化');
+        return;
+    }
+
+    console.log('正在初始化EasilyPanel应用...');
     app = new EasilyPanel();
 
     // 将app实例暴露到全局作用域，供HTML中的onclick使用
@@ -958,7 +1000,26 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // 页面卸载时清理资源
 window.addEventListener('beforeunload', () => {
+    console.log('页面卸载，清理资源...');
     if (app && app.wsManager) {
-        app.wsManager.close();
+        app.wsManager.destroy();
+    }
+    app = null;
+});
+
+// 页面隐藏时暂停WebSocket
+document.addEventListener('visibilitychange', () => {
+    if (app && app.wsManager) {
+        if (document.hidden) {
+            console.log('页面隐藏，暂停WebSocket');
+            // 不关闭连接，只是停止重连
+            app.wsManager.maxReconnectAttempts = 0;
+        } else {
+            console.log('页面显示，恢复WebSocket');
+            app.wsManager.maxReconnectAttempts = 5;
+            if (!app.wsManager.isConnected()) {
+                app.wsManager.connect();
+            }
+        }
     }
 });
