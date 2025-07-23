@@ -372,15 +372,17 @@ class FileManagerComponent {
     // 加载文件列表
     async loadFiles() {
         try {
-            const url = `${this.options.apiEndpoint}?path=${encodeURIComponent(this.currentPath)}`;
+            const url = `${this.options.apiEndpoint}?path=${encodeURIComponent(this.currentPath)}&sort_by=${this.sortBy}&order=${this.sortOrder}`;
             const response = await fetch(url);
-            
-            if (response.ok) {
-                this.files = await response.json();
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                this.files = result.data.files || [];
                 this.filterAndRenderFiles();
                 this.updateToolbarState();
             } else {
-                this.showError('加载文件列表失败');
+                const errorMessage = result.message || result.error || '加载文件列表失败';
+                this.showError(errorMessage);
             }
         } catch (error) {
             console.error('Failed to load files:', error);
@@ -544,12 +546,198 @@ class FileManagerComponent {
         console.log('Show upload dialog');
     }
     
+    // 处理创建操作
     handleCreateAction(action) {
-        console.log('Handle create action:', action);
+        const uiManager = window.getUIManager();
+
+        if (action === 'folder') {
+            this.showCreateDialog(true);
+        } else if (action === 'file') {
+            this.showCreateDialog(false);
+        }
     }
-    
-    uploadFiles(files) {
-        console.log('Upload files:', files);
+
+    // 显示创建对话框
+    showCreateDialog(isDir) {
+        const uiManager = window.getUIManager();
+        const type = isDir ? '文件夹' : '文件';
+
+        const content = `
+            <div class="create-dialog">
+                <div class="form-group">
+                    <label for="itemName">${type}名称</label>
+                    <input type="text" id="itemName" class="form-input" placeholder="输入${type}名称" required>
+                </div>
+            </div>
+        `;
+
+        const modal = uiManager?.showModal(`创建${type}`, content, {
+            width: '400px',
+            footer: `
+                <button class="btn" onclick="window.getUIManager().closeModal()">
+                    <i class="mdi mdi-close"></i>
+                    <span>取消</span>
+                </button>
+                <button class="btn primary" id="confirmCreateBtn">
+                    <i class="mdi mdi-check"></i>
+                    <span>创建</span>
+                </button>
+            `
+        });
+
+        if (modal) {
+            const confirmBtn = modal.querySelector('#confirmCreateBtn');
+            const nameInput = modal.querySelector('#itemName');
+
+            confirmBtn.addEventListener('click', () => {
+                const name = nameInput.value.trim();
+                if (name) {
+                    this.createItem(name, isDir);
+                }
+            });
+
+            nameInput.addEventListener('keypress', (e) => {
+                if (e.key === 'Enter') {
+                    confirmBtn.click();
+                }
+            });
+
+            nameInput.focus();
+        }
+    }
+
+    // 创建文件或文件夹
+    async createItem(name, isDir) {
+        const uiManager = window.getUIManager();
+
+        try {
+            const path = this.currentPath === '/' ? name : `${this.currentPath}/${name}`;
+
+            const response = await fetch(this.options.apiEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'create',
+                    path: path,
+                    is_dir: isDir
+                })
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                uiManager?.closeModal();
+                uiManager?.showNotification('创建成功', `${isDir ? '文件夹' : '文件'}创建成功`, 'success');
+                await this.loadFiles();
+            } else {
+                const errorMessage = result.message || result.error || '创建失败';
+                uiManager?.showNotification('创建失败', errorMessage, 'error');
+            }
+        } catch (error) {
+            console.error('Create item failed:', error);
+            uiManager?.showNotification('创建失败', '网络错误，请重试', 'error');
+        }
+    }
+
+    // 上传文件
+    async uploadFiles(files) {
+        const uiManager = window.getUIManager();
+
+        for (const file of files) {
+            try {
+                const formData = new FormData();
+                formData.append('file', file);
+                formData.append('path', this.currentPath);
+
+                const response = await fetch(this.options.apiEndpoint, {
+                    method: 'PUT',
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success) {
+                    uiManager?.showNotification('上传成功', `文件 ${file.name} 上传成功`, 'success');
+                } else {
+                    const errorMessage = result.message || result.error || '上传失败';
+                    uiManager?.showNotification('上传失败', `文件 ${file.name}: ${errorMessage}`, 'error');
+                }
+            } catch (error) {
+                console.error('Upload file failed:', error);
+                uiManager?.showNotification('上传失败', `文件 ${file.name}: 网络错误`, 'error');
+            }
+        }
+
+        // 刷新文件列表
+        await this.loadFiles();
+    }
+
+    // 删除文件或文件夹
+    async deleteItem(path) {
+        const uiManager = window.getUIManager();
+
+        try {
+            const response = await fetch(this.options.apiEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'delete',
+                    path: path
+                })
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                uiManager?.showNotification('删除成功', '删除成功', 'success');
+                await this.loadFiles();
+            } else {
+                const errorMessage = result.message || result.error || '删除失败';
+                uiManager?.showNotification('删除失败', errorMessage, 'error');
+            }
+        } catch (error) {
+            console.error('Delete item failed:', error);
+            uiManager?.showNotification('删除失败', '网络错误，请重试', 'error');
+        }
+    }
+
+    // 重命名文件或文件夹
+    async renameItem(oldPath, newName) {
+        const uiManager = window.getUIManager();
+
+        try {
+            const dir = oldPath.substring(0, oldPath.lastIndexOf('/'));
+            const newPath = dir ? `${dir}/${newName}` : newName;
+
+            const response = await fetch(this.options.apiEndpoint, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify({
+                    action: 'rename',
+                    path: oldPath,
+                    target: newPath
+                })
+            });
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                uiManager?.showNotification('重命名成功', '重命名成功', 'success');
+                await this.loadFiles();
+            } else {
+                const errorMessage = result.message || result.error || '重命名失败';
+                uiManager?.showNotification('重命名失败', errorMessage, 'error');
+            }
+        } catch (error) {
+            console.error('Rename item failed:', error);
+            uiManager?.showNotification('重命名失败', '网络错误，请重试', 'error');
+        }
     }
 }
 

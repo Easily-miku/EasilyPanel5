@@ -3,6 +3,7 @@ package api
 import (
 	"net/http"
 	"path/filepath"
+	"strings"
 )
 
 // AuthHandlers 认证处理器接口
@@ -22,25 +23,36 @@ func SetupRoutes(authHandlers AuthHandlers) http.Handler {
 
 	// 静态文件服务
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
-	
+
 	// 主页
 	mux.HandleFunc("/", serveIndex)
 
 	// API路由
 	mux.HandleFunc("/api/status", handleStatus)
-	
+
 	// Java环境相关
 	mux.HandleFunc("/api/java/detect", handleJavaDetect)
 	mux.HandleFunc("/api/java/config", handleJavaConfig)
-	
+
 	// 核心下载相关
 	mux.HandleFunc("/api/cores/list", handleCoresList)
 	mux.HandleFunc("/api/cores/versions", handleCoresVersions)
 	mux.HandleFunc("/api/cores/download", handleCoresDownload)
-	
+
 	// 服务器管理相关
 	mux.HandleFunc("/api/servers", handleServers)
-	mux.HandleFunc("/api/servers/", handleServerDetail)
+
+	// 服务器详细操作（使用更具体的路由模式）
+	mux.HandleFunc("/api/servers/", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if strings.HasSuffix(path, "/logs") {
+			handleServerLogs(w, r)
+		} else if strings.HasSuffix(path, "/command") {
+			handleServerCommand(w, r)
+		} else {
+			handleServerDetail(w, r)
+		}
+	})
 
 	// 守护管理
 	mux.HandleFunc("/api/daemon/status", handleDaemonStatus)
@@ -59,16 +71,41 @@ func SetupRoutes(authHandlers AuthHandlers) http.Handler {
 	mux.HandleFunc("/api/groups/", handleGroupAction)
 	mux.HandleFunc("/api/batch", handleBatchOperations)
 	mux.HandleFunc("/api/batch/", handleBatchAction)
-	
+
+	// 文件管理
+	mux.HandleFunc("/api/files", handleFiles)
+	mux.HandleFunc("/api/files/download", handleFileDownload)
+	mux.HandleFunc("/api/files/content", handleFileContent)
+
+	// 系统监控
+	mux.HandleFunc("/api/monitoring/system", handleSystemStats)
+	mux.HandleFunc("/api/monitoring/servers", handleServerStats)
+	mux.HandleFunc("/api/monitoring/historical", handleHistoricalStats)
+
+	// 系统设置
+	mux.HandleFunc("/api/settings", handleSettings)
+
 	// WebSocket
 	mux.HandleFunc("/ws", ServeWS)
 
-	// 如果有认证处理器，应用认证中间件
+	// 构建中间件链
+	var handler http.Handler = mux
+
+	// 应用认证中间件（如果存在）
 	if authHandlers != nil {
-		return authHandlers.AuthMiddleware(mux)
+		handler = authHandlers.AuthMiddleware(handler)
 	}
 
-	return mux
+	// 应用通用中间件链
+	handler = ChainMiddleware(handler,
+		RecoveryMiddleware,    // 最外层：panic恢复
+		LoggingMiddleware,     // 日志记录
+		SecurityMiddleware,    // 安全头
+		CORSMiddleware,        // CORS处理
+		ContentTypeMiddleware, // 内容类型设置
+	)
+
+	return handler
 }
 
 // serveIndex 服务主页
@@ -84,40 +121,28 @@ func serveIndex(w http.ResponseWriter, r *http.Request) {
 
 // handleStatus 处理状态查询
 func handleStatus(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	if err := ValidateMethod(r, http.MethodGet); err != nil {
+		WriteStandardError(w, "METHOD_NOT_ALLOWED", err.Error(), http.StatusMethodNotAllowed)
 		return
 	}
 
 	response := map[string]interface{}{
 		"status":  "ok",
-		"version": "1.0.0",
+		"version": "1.1.0",
 		"name":    "EasilyPanel5",
 	}
 
-	writeJSONResponse(w, response)
+	WriteStandardResponse(w, response)
 }
 
 
 
-// writeJSONResponse 写入JSON响应
+// writeJSONResponse 写入JSON响应（保持向后兼容）
 func writeJSONResponse(w http.ResponseWriter, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	if err := writeJSON(w, data); err != nil {
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
-	}
+	WriteStandardResponse(w, data)
 }
 
-// writeErrorResponse 写入错误响应
+// writeErrorResponse 写入错误响应（保持向后兼容）
 func writeErrorResponse(w http.ResponseWriter, message string, code int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(code)
-	
-	response := map[string]interface{}{
-		"error":   true,
-		"message": message,
-		"code":    code,
-	}
-	
-	writeJSON(w, response)
+	WriteStandardError(w, "API_ERROR", message, code)
 }

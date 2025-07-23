@@ -379,17 +379,21 @@ class FRPPageManager {
     async loadTunnels() {
         try {
             const response = await fetch('/api/frp/tunnels');
-            if (response.ok) {
-                const tunnels = await response.json();
+            const result = await response.json();
+
+            if (response.ok && result.success) {
                 this.tunnels.clear();
-                
-                tunnels.forEach(tunnel => {
+
+                // 处理新的API响应格式
+                const tunnelsData = result.data || [];
+                tunnelsData.forEach(tunnel => {
                     this.tunnels.set(tunnel.id, tunnel);
                 });
-                
+
                 this.filterAndRenderTunnels();
             } else {
-                this.showTunnelsError('加载隧道列表失败');
+                const errorMessage = result.message || result.error || '加载隧道列表失败';
+                this.showTunnelsError(errorMessage);
             }
         } catch (error) {
             console.error('Failed to load tunnels:', error);
@@ -728,22 +732,49 @@ class FRPPageManager {
     // 创建隧道
     async createTunnel() {
         const uiManager = window.getUIManager();
-        
-        const tunnelData = {
-            name: document.getElementById('tunnelName').value.trim(),
-            type: document.getElementById('tunnelType').value,
-            local_ip: document.getElementById('localIp').value.trim(),
-            local_port: parseInt(document.getElementById('localPort').value),
-            remote_port: document.getElementById('remotePort').value ? parseInt(document.getElementById('remotePort').value) : null,
-            subdomain: document.getElementById('subdomain').value.trim(),
-            custom_domain: document.getElementById('customDomain').value.trim()
-        };
-        
-        if (!tunnelData.name || !tunnelData.local_port) {
-            uiManager?.showNotification('创建失败', '请填写必要信息', 'warning');
+
+        // 获取表单数据
+        const name = document.getElementById('tunnelName').value.trim();
+        const type = document.getElementById('tunnelType').value;
+        const localIp = document.getElementById('localIp').value.trim() || '127.0.0.1';
+        const localPort = parseInt(document.getElementById('localPort').value);
+        const remotePort = document.getElementById('remotePort').value ? parseInt(document.getElementById('remotePort').value) : null;
+        const subdomain = document.getElementById('subdomain').value.trim();
+        const customDomain = document.getElementById('customDomain').value.trim();
+
+        // 客户端验证
+        if (!name) {
+            uiManager?.showNotification('创建失败', '请输入隧道名称', 'warning');
             return;
         }
-        
+
+        if (!type) {
+            uiManager?.showNotification('创建失败', '请选择隧道类型', 'warning');
+            return;
+        }
+
+        if (!localPort || localPort < 1 || localPort > 65535) {
+            uiManager?.showNotification('创建失败', '请输入有效的本地端口（1-65535）', 'warning');
+            return;
+        }
+
+        if (remotePort && (remotePort < 1 || remotePort > 65535)) {
+            uiManager?.showNotification('创建失败', '请输入有效的远程端口（1-65535）', 'warning');
+            return;
+        }
+
+        // 构建隧道数据（匹配后端API格式）
+        const tunnelData = {
+            name: name,
+            type: type,
+            token: 'default-token', // 这里应该从配置中获取
+            local_ip: localIp,
+            local_port: localPort,
+            remote_port: remotePort,
+            subdomain: subdomain,
+            custom_domain: customDomain
+        };
+
         try {
             const response = await fetch('/api/frp/tunnels', {
                 method: 'POST',
@@ -752,14 +783,16 @@ class FRPPageManager {
                 },
                 body: JSON.stringify(tunnelData)
             });
-            
-            if (response.ok) {
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
                 uiManager?.closeModal();
                 uiManager?.showNotification('创建成功', '隧道创建成功', 'success');
                 await this.loadTunnels(); // 刷新列表
             } else {
-                const error = await response.json();
-                uiManager?.showNotification('创建失败', error.message || '创建隧道失败', 'error');
+                const errorMessage = result.message || result.error || '创建隧道失败';
+                uiManager?.showNotification('创建失败', errorMessage, 'error');
             }
         } catch (error) {
             console.error('Create tunnel failed:', error);

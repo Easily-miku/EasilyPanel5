@@ -249,11 +249,14 @@ class MonitoringPageManager {
     async loadSystemStats() {
         try {
             const response = await fetch('/api/monitoring/system');
-            if (response.ok) {
-                this.systemStats = await response.json();
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                this.systemStats = result.data;
                 this.renderSystemStats();
             } else {
-                this.showSystemError('加载系统信息失败');
+                const errorMessage = result.message || result.error || '加载系统信息失败';
+                this.showSystemError(errorMessage);
             }
         } catch (error) {
             console.error('Failed to load system stats:', error);
@@ -265,15 +268,18 @@ class MonitoringPageManager {
     async loadServerStats() {
         try {
             const response = await fetch('/api/monitoring/servers');
-            if (response.ok) {
-                const servers = await response.json();
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                const servers = result.data || [];
                 this.serverStats.clear();
                 servers.forEach(server => {
-                    this.serverStats.set(server.id, server);
+                    this.serverStats.set(server.server_id, server);
                 });
                 this.renderServerStats();
             } else {
-                this.showServersError('加载服务器状态失败');
+                const errorMessage = result.message || result.error || '加载服务器状态失败';
+                this.showServersError(errorMessage);
             }
         } catch (error) {
             console.error('Failed to load server stats:', error);
@@ -284,9 +290,11 @@ class MonitoringPageManager {
     // 加载图表数据
     async loadChartsData() {
         try {
-            const response = await fetch(`/api/monitoring/charts?range=${this.currentTimeRange}`);
-            if (response.ok) {
-                const chartsData = await response.json();
+            const response = await fetch(`/api/monitoring/historical?type=system&range=${this.currentTimeRange}`);
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                const chartsData = result.data || [];
                 this.updateCharts(chartsData);
             }
         } catch (error) {

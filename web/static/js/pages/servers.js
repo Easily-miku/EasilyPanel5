@@ -155,17 +155,21 @@ class ServersPageManager {
     async loadServers() {
         try {
             const response = await fetch('/api/servers');
-            if (response.ok) {
-                const servers = await response.json();
+            const result = await response.json();
+
+            if (response.ok && result.success) {
                 this.servers.clear();
-                
-                servers.forEach(server => {
+
+                // 处理新的API响应格式
+                const serversData = result.data || {};
+                Object.values(serversData).forEach(server => {
                     this.servers.set(server.id, server);
                 });
-                
+
                 this.filterAndRenderServers();
             } else {
-                this.showError('加载服务器列表失败');
+                const errorMessage = result.message || result.error || '加载服务器列表失败';
+                this.showError(errorMessage);
             }
         } catch (error) {
             console.error('Failed to load servers:', error);
@@ -585,22 +589,70 @@ class ServersPageManager {
     // 创建服务器
     async createServer() {
         const uiManager = window.getUIManager();
-        
-        const serverData = {
-            name: document.getElementById('serverName').value.trim(),
-            description: document.getElementById('serverDescription').value.trim(),
-            version: document.getElementById('serverVersion').value,
-            core: document.getElementById('serverCore').value,
-            port: parseInt(document.getElementById('serverPort').value),
-            memory: document.getElementById('serverMemory').value,
-            max_players: parseInt(document.getElementById('maxPlayers').value)
-        };
-        
-        if (!serverData.name) {
+
+        // 获取表单数据
+        const name = document.getElementById('serverName').value.trim();
+        const description = document.getElementById('serverDescription').value.trim();
+        const mcVersion = document.getElementById('serverVersion').value;
+        const coreType = document.getElementById('serverCore').value;
+        const port = parseInt(document.getElementById('serverPort').value) || 25565;
+        const memoryStr = document.getElementById('serverMemory').value;
+        const maxPlayers = parseInt(document.getElementById('maxPlayers').value) || 20;
+
+        // 客户端验证
+        if (!name) {
             uiManager?.showNotification('创建失败', '请输入服务器名称', 'warning');
             return;
         }
-        
+
+        if (!mcVersion) {
+            uiManager?.showNotification('创建失败', '请选择Minecraft版本', 'warning');
+            return;
+        }
+
+        if (!coreType) {
+            uiManager?.showNotification('创建失败', '请选择服务器核心', 'warning');
+            return;
+        }
+
+        // 解析内存大小
+        let memory = 2048; // 默认2GB
+        if (memoryStr) {
+            try {
+                if (memoryStr.endsWith('G') || memoryStr.endsWith('GB')) {
+                    memory = parseInt(memoryStr) * 1024;
+                } else if (memoryStr.endsWith('M') || memoryStr.endsWith('MB')) {
+                    memory = parseInt(memoryStr);
+                } else {
+                    memory = parseInt(memoryStr);
+                }
+            } catch (e) {
+                memory = 2048;
+            }
+        }
+
+        // 构建服务器数据（匹配后端API格式）
+        const serverData = {
+            name: name,
+            description: description,
+            core_type: coreType,
+            mc_version: mcVersion,
+            core_version: 'latest', // 默认使用最新版本
+            memory: memory,
+            port: port,
+            auto_start: false,
+            auto_restart: true,
+            daemon_enabled: true,
+            backup_enabled: false,
+            monitoring_enabled: true,
+            properties: {
+                'max-players': maxPlayers.toString(),
+                'online-mode': 'true',
+                'difficulty': 'normal',
+                'gamemode': 'survival'
+            }
+        };
+
         try {
             const response = await fetch('/api/servers', {
                 method: 'POST',
@@ -609,14 +661,16 @@ class ServersPageManager {
                 },
                 body: JSON.stringify(serverData)
             });
-            
-            if (response.ok) {
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
                 uiManager?.closeModal();
                 uiManager?.showNotification('创建成功', '服务器创建成功', 'success');
                 await this.loadServers(); // 刷新列表
             } else {
-                const error = await response.json();
-                uiManager?.showNotification('创建失败', error.message || '创建服务器失败', 'error');
+                const errorMessage = result.message || result.error || '创建服务器失败';
+                uiManager?.showNotification('创建失败', errorMessage, 'error');
             }
         } catch (error) {
             console.error('Create server failed:', error);
@@ -662,8 +716,21 @@ class ServersPageManager {
     
     // 打开控制台
     openConsole(serverId) {
-        // TODO: 实现控制台功能
-        console.log('Open console for server:', serverId);
+        // 检查服务器是否存在
+        const server = this.servers.get(serverId);
+        if (!server) {
+            const uiManager = window.getUIManager();
+            uiManager?.showNotification('错误', '服务器不存在', 'error');
+            return;
+        }
+
+        // 创建控制台组件
+        new ServerConsoleComponent(serverId, {
+            maxLines: 1000,
+            autoScroll: true,
+            showTimestamp: true,
+            enableInput: true
+        });
     }
     
     // 显示编辑服务器对话框

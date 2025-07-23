@@ -748,11 +748,14 @@ class SettingsPageManager {
     async loadSettings() {
         try {
             const response = await fetch('/api/settings');
-            if (response.ok) {
-                this.settings = await response.json();
+            const result = await response.json();
+
+            if (response.ok && result.success) {
+                this.settings = result.data || {};
                 this.populateForm();
             } else {
-                this.showError('加载设置失败');
+                const errorMessage = result.message || result.error || '加载设置失败';
+                this.showError(errorMessage);
             }
         } catch (error) {
             console.error('Failed to load settings:', error);
@@ -797,10 +800,10 @@ class SettingsPageManager {
     // 保存设置
     async saveSettings() {
         const uiManager = window.getUIManager();
-        
+
         try {
             const formData = this.collectFormData();
-            
+
             const response = await fetch('/api/settings', {
                 method: 'PUT',
                 headers: {
@@ -808,14 +811,16 @@ class SettingsPageManager {
                 },
                 body: JSON.stringify(formData)
             });
-            
-            if (response.ok) {
+
+            const result = await response.json();
+
+            if (response.ok && result.success) {
                 this.settings = formData;
                 this.clearChanges();
                 uiManager?.showNotification('保存成功', '设置已保存', 'success');
             } else {
-                const error = await response.json();
-                uiManager?.showNotification('保存失败', error.message || '保存设置失败', 'error');
+                const errorMessage = result.message || result.error || '保存设置失败';
+                uiManager?.showNotification('保存失败', errorMessage, 'error');
             }
         } catch (error) {
             console.error('Save settings failed:', error);

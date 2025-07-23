@@ -18,7 +18,7 @@ class TemplatesPageManager {
     renderPage() {
         const templatesPage = document.getElementById('templates-page');
         if (!templatesPage) return;
-        
+
         templatesPage.innerHTML = `
             <div class="page-header">
                 <h2>服务端市场</h2>
@@ -26,11 +26,57 @@ class TemplatesPageManager {
             </div>
 
             <div class="templates-container">
-                ${this.renderDevelopmentNotice()}
+                ${this.renderToolbar()}
+                ${this.renderTemplatesList()}
             </div>
         `;
     }
-    
+
+    // 渲染工具栏
+    renderToolbar() {
+        return `
+            <div class="templates-toolbar">
+                <div class="toolbar-left">
+                    <div class="search-box">
+                        <i class="mdi mdi-magnify"></i>
+                        <input type="text" id="templateSearch" placeholder="搜索模板..." value="${this.searchQuery}">
+                    </div>
+
+                    <div class="filter-group">
+                        <select id="categoryFilter" class="filter-select">
+                            <option value="all">全部分类</option>
+                            <option value="vanilla">原版</option>
+                            <option value="paper">Paper</option>
+                            <option value="spigot">Spigot</option>
+                            <option value="forge">Forge</option>
+                            <option value="fabric">Fabric</option>
+                            <option value="custom">自定义</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="toolbar-right">
+                    <button class="btn primary" id="createTemplateBtn">
+                        <i class="mdi mdi-plus"></i>
+                        <span>创建模板</span>
+                    </button>
+                </div>
+            </div>
+        `;
+    }
+
+    // 渲染模板列表
+    renderTemplatesList() {
+        return `
+            <div class="templates-list" id="templatesList">
+                <div class="loading-state">
+                    <i class="mdi mdi-loading mdi-spin"></i>
+                    <p>加载中...</p>
+                </div>
+            </div>
+        `;
+    }
+
     // 渲染开发中提示
     renderDevelopmentNotice() {
         return `
@@ -138,26 +184,20 @@ class TemplatesPageManager {
                 this.filterAndRenderTemplates();
             });
         }
-        
-        // 分类标签
-        const categoryTabs = document.querySelectorAll('.category-tab');
-        categoryTabs.forEach(tab => {
-            tab.addEventListener('click', (e) => {
-                const category = e.currentTarget.getAttribute('data-category');
-                this.setActiveCategory(category);
+
+        // 分类过滤器
+        const categoryFilter = document.getElementById('categoryFilter');
+        if (categoryFilter) {
+            categoryFilter.addEventListener('change', (e) => {
+                this.currentCategory = e.target.value;
+                this.filterAndRenderTemplates();
             });
-        });
-        
+        }
+
         // 创建模板按钮
         const createBtn = document.getElementById('createTemplateBtn');
         if (createBtn) {
             createBtn.addEventListener('click', () => this.showCreateTemplateDialog());
-        }
-        
-        // 导入模板按钮
-        const importBtn = document.getElementById('importTemplateBtn');
-        if (importBtn) {
-            importBtn.addEventListener('click', () => this.showImportTemplateDialog());
         }
     }
     
@@ -178,24 +218,183 @@ class TemplatesPageManager {
     async loadTemplates() {
         try {
             const response = await fetch('/api/templates');
-            if (response.ok) {
-                const templates = await response.json();
+            const result = await response.json();
+
+            if (response.ok && result.success) {
                 this.templates.clear();
-                
-                templates.forEach(template => {
+
+                // 处理新的API响应格式
+                const templatesData = result.data || [];
+                templatesData.forEach(template => {
                     this.templates.set(template.id, template);
                 });
-                
+
+                // 如果没有模板，添加一些默认模板
+                if (templatesData.length === 0) {
+                    this.addDefaultTemplates();
+                }
+
                 this.filterAndRenderTemplates();
             } else {
-                this.showError('加载模板列表失败');
+                const errorMessage = result.message || result.error || '加载模板列表失败';
+                this.showError(errorMessage);
             }
         } catch (error) {
             console.error('Failed to load templates:', error);
             this.showError('网络错误，请重试');
         }
     }
-    
+
+    // 添加默认模板
+    addDefaultTemplates() {
+        const defaultTemplates = [
+            {
+                id: 'vanilla-1.20.1',
+                name: 'Vanilla 1.20.1',
+                description: '官方原版Minecraft服务器',
+                category: 'vanilla',
+                core_type: 'vanilla',
+                mc_version: '1.20.1',
+                memory: 2048,
+                port: 25565,
+                properties: {
+                    'max-players': '20',
+                    'difficulty': 'normal',
+                    'gamemode': 'survival'
+                },
+                is_official: true,
+                downloads: 1250,
+                rating: 4.8
+            },
+            {
+                id: 'paper-1.20.1',
+                name: 'Paper 1.20.1',
+                description: '高性能Paper服务器，支持插件',
+                category: 'paper',
+                core_type: 'paper',
+                mc_version: '1.20.1',
+                memory: 2048,
+                port: 25565,
+                properties: {
+                    'max-players': '50',
+                    'difficulty': 'normal',
+                    'gamemode': 'survival'
+                },
+                is_official: true,
+                downloads: 2100,
+                rating: 4.9
+            },
+            {
+                id: 'spigot-1.20.1',
+                name: 'Spigot 1.20.1',
+                description: '经典Spigot服务器，插件兼容性好',
+                category: 'spigot',
+                core_type: 'spigot',
+                mc_version: '1.20.1',
+                memory: 2048,
+                port: 25565,
+                properties: {
+                    'max-players': '30',
+                    'difficulty': 'normal',
+                    'gamemode': 'survival'
+                },
+                is_official: true,
+                downloads: 890,
+                rating: 4.7
+            }
+        ];
+
+        defaultTemplates.forEach(template => {
+            this.templates.set(template.id, template);
+        });
+    }
+
+    // 显示创建模板对话框
+    showCreateTemplateDialog() {
+        const uiManager = window.getUIManager();
+
+        const content = `
+            <div class="create-template-form">
+                <div class="form-group">
+                    <label for="templateName">模板名称</label>
+                    <input type="text" id="templateName" class="form-input" placeholder="输入模板名称" required>
+                </div>
+
+                <div class="form-group">
+                    <label for="templateDescription">模板描述</label>
+                    <textarea id="templateDescription" class="form-input" placeholder="输入模板描述" rows="3"></textarea>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="templateCategory">分类</label>
+                        <select id="templateCategory" class="form-input">
+                            <option value="custom">自定义</option>
+                            <option value="vanilla">原版</option>
+                            <option value="paper">Paper</option>
+                            <option value="spigot">Spigot</option>
+                            <option value="forge">Forge</option>
+                            <option value="fabric">Fabric</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="templateCoreType">核心类型</label>
+                        <select id="templateCoreType" class="form-input">
+                            <option value="vanilla">Vanilla</option>
+                            <option value="paper">Paper</option>
+                            <option value="spigot">Spigot</option>
+                            <option value="bukkit">Bukkit</option>
+                            <option value="forge">Forge</option>
+                            <option value="fabric">Fabric</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="form-row">
+                    <div class="form-group">
+                        <label for="templateVersion">Minecraft版本</label>
+                        <select id="templateVersion" class="form-input">
+                            <option value="1.20.1">1.20.1</option>
+                            <option value="1.19.4">1.19.4</option>
+                            <option value="1.18.2">1.18.2</option>
+                            <option value="1.16.5">1.16.5</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="templateMemory">默认内存</label>
+                        <select id="templateMemory" class="form-input">
+                            <option value="1024">1GB</option>
+                            <option value="2048" selected>2GB</option>
+                            <option value="4096">4GB</option>
+                            <option value="8192">8GB</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+        `;
+
+        const modal = uiManager?.showModal('创建模板', content, {
+            width: '600px',
+            footer: `
+                <button class="btn" onclick="window.getUIManager().closeModal()">
+                    <i class="mdi mdi-close"></i>
+                    <span>取消</span>
+                </button>
+                <button class="btn primary" id="confirmCreateTemplateBtn">
+                    <i class="mdi mdi-check"></i>
+                    <span>创建模板</span>
+                </button>
+            `
+        });
+
+        if (modal) {
+            const confirmBtn = modal.querySelector('#confirmCreateTemplateBtn');
+            confirmBtn.addEventListener('click', () => this.createTemplate());
+        }
+    }
+
     // 过滤和渲染模板
     filterAndRenderTemplates() {
         const templatesList = document.getElementById('templatesList');

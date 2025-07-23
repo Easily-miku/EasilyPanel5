@@ -4,27 +4,30 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
+	"time"
 
 	"easilypanel5/config"
 	"easilypanel5/frp"
 	"easilypanel5/server"
+	"easilypanel5/utils"
 )
 
 // handleJavaDetect 处理Java环境检测
 func handleJavaDetect(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+	if err := ValidateMethod(r, http.MethodGet); err != nil {
+		WriteStandardError(w, "METHOD_NOT_ALLOWED", err.Error(), http.StatusMethodNotAllowed)
 		return
 	}
 
 	javaInfo, err := server.GetJavaInfo()
 	if err != nil {
-		writeErrorResponse(w, fmt.Sprintf("Failed to detect Java: %v", err), http.StatusInternalServerError)
+		WriteStandardError(w, "JAVA_DETECTION_FAILED", fmt.Sprintf("Failed to detect Java: %v", err), http.StatusInternalServerError)
 		return
 	}
 
-	writeJSONResponse(w, javaInfo)
+	WriteStandardResponse(w, javaInfo)
 }
 
 // handleJavaConfig 处理Java配置
@@ -49,16 +52,44 @@ func handleJavaConfig(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeErrorResponse(w, "Invalid JSON", http.StatusBadRequest)
+			WriteStandardError(w, "INVALID_JSON", "Invalid JSON format", http.StatusBadRequest)
 			return
 		}
 
+		// 数据验证
+		var validationErrors utils.ValidationErrors
+
 		// 验证Java路径
 		if req.JavaPath != "" {
-			if _, err := server.CheckJavaPath(req.JavaPath); err != nil {
-				writeErrorResponse(w, fmt.Sprintf("Invalid Java path: %v", err), http.StatusBadRequest)
-				return
+			if err := utils.ValidateFilePath("java_path", req.JavaPath); err != nil {
+				if valErr, ok := err.(utils.ValidationError); ok {
+					validationErrors = append(validationErrors, valErr)
+				}
+			} else {
+				// 进一步验证Java路径是否有效
+				if _, err := server.CheckJavaPath(req.JavaPath); err != nil {
+					validationErrors = append(validationErrors, utils.ValidationError{
+						Field:   "java_path",
+						Message: fmt.Sprintf("Invalid Java path: %v", err),
+						Code:    "INVALID_JAVA_PATH",
+					})
+				}
 			}
+		}
+
+		// 验证Java参数
+		if len(req.DefaultArgs) > 0 {
+			if err := utils.ValidateJavaArgs("default_args", req.DefaultArgs); err != nil {
+				if valErr, ok := err.(utils.ValidationError); ok {
+					validationErrors = append(validationErrors, valErr)
+				}
+			}
+		}
+
+		// 如果有验证错误，返回错误信息
+		if len(validationErrors) > 0 {
+			WriteStandardError(w, "VALIDATION_FAILED", validationErrors.Error(), http.StatusBadRequest)
+			return
 		}
 
 		// 更新配置
@@ -70,14 +101,14 @@ func handleJavaConfig(w http.ResponseWriter, r *http.Request) {
 		}
 
 		if err := config.Update(cfg); err != nil {
-			writeErrorResponse(w, "Failed to update config", http.StatusInternalServerError)
+			WriteStandardError(w, "CONFIG_UPDATE_FAILED", "Failed to update config", http.StatusInternalServerError)
 			return
 		}
 
-		writeJSONResponse(w, map[string]string{"status": "ok"})
+		WriteStandardResponse(w, map[string]string{"status": "ok"})
 
 	default:
-		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
+		WriteStandardError(w, "METHOD_NOT_ALLOWED", "Method not allowed", http.StatusMethodNotAllowed)
 	}
 }
 
@@ -165,13 +196,55 @@ func handleServers(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		var req config.MinecraftServer
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeErrorResponse(w, "Invalid JSON", http.StatusBadRequest)
+			WriteStandardError(w, "INVALID_JSON", "Invalid JSON format", http.StatusBadRequest)
 			return
 		}
 
-		// 验证必要字段
-		if req.Name == "" || req.CoreType == "" || req.MCVersion == "" {
-			writeErrorResponse(w, "Missing required fields", http.StatusBadRequest)
+		// 数据验证
+		var validationErrors utils.ValidationErrors
+
+		// 验证服务器名称
+		if err := utils.ValidateServerName("name", req.Name); err != nil {
+			if valErr, ok := err.(utils.ValidationError); ok {
+				validationErrors = append(validationErrors, valErr)
+			}
+		}
+
+		// 验证核心类型
+		if err := utils.ValidateCoreType("core_type", req.CoreType); err != nil {
+			if valErr, ok := err.(utils.ValidationError); ok {
+				validationErrors = append(validationErrors, valErr)
+			}
+		}
+
+		// 验证Minecraft版本
+		if err := utils.ValidateMinecraftVersion("mc_version", req.MCVersion); err != nil {
+			if valErr, ok := err.(utils.ValidationError); ok {
+				validationErrors = append(validationErrors, valErr)
+			}
+		}
+
+		// 验证内存大小
+		if req.Memory > 0 {
+			if err := utils.ValidateMemorySize("memory", req.Memory); err != nil {
+				if valErr, ok := err.(utils.ValidationError); ok {
+					validationErrors = append(validationErrors, valErr)
+				}
+			}
+		}
+
+		// 验证端口
+		if req.Port > 0 {
+			if err := utils.ValidatePort("port", req.Port); err != nil {
+				if valErr, ok := err.(utils.ValidationError); ok {
+					validationErrors = append(validationErrors, valErr)
+				}
+			}
+		}
+
+		// 如果有验证错误，返回错误信息
+		if len(validationErrors) > 0 {
+			WriteStandardError(w, "VALIDATION_FAILED", validationErrors.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -377,13 +450,48 @@ func handleFRPTunnels(w http.ResponseWriter, r *http.Request) {
 	case http.MethodPost:
 		var req frp.TunnelRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-			writeErrorResponse(w, "Invalid JSON", http.StatusBadRequest)
+			WriteStandardError(w, "INVALID_JSON", "Invalid JSON format", http.StatusBadRequest)
 			return
 		}
 
-		// 验证必要字段
-		if req.Name == "" || req.Type == "" || req.Token == "" {
-			writeErrorResponse(w, "Missing required fields", http.StatusBadRequest)
+		// 数据验证
+		var validationErrors utils.ValidationErrors
+
+		// 验证隧道名称
+		if err := utils.ValidateRequired("name", req.Name); err != nil {
+			if valErr, ok := err.(utils.ValidationError); ok {
+				validationErrors = append(validationErrors, valErr)
+			}
+		} else if err := utils.ValidateStringLength("name", req.Name, 1, 50); err != nil {
+			if valErr, ok := err.(utils.ValidationError); ok {
+				validationErrors = append(validationErrors, valErr)
+			}
+		}
+
+		// 验证隧道类型
+		if err := utils.ValidateRequired("type", req.Type); err != nil {
+			if valErr, ok := err.(utils.ValidationError); ok {
+				validationErrors = append(validationErrors, valErr)
+			}
+		} else {
+			validTypes := []string{"tcp", "udp", "http", "https"}
+			if err := utils.ValidateStringInSlice("type", req.Type, validTypes); err != nil {
+				if valErr, ok := err.(utils.ValidationError); ok {
+					validationErrors = append(validationErrors, valErr)
+				}
+			}
+		}
+
+		// 验证Token
+		if err := utils.ValidateRequired("token", req.Token); err != nil {
+			if valErr, ok := err.(utils.ValidationError); ok {
+				validationErrors = append(validationErrors, valErr)
+			}
+		}
+
+		// 如果有验证错误，返回错误信息
+		if len(validationErrors) > 0 {
+			WriteStandardError(w, "VALIDATION_FAILED", validationErrors.Error(), http.StatusBadRequest)
 			return
 		}
 
@@ -680,6 +788,92 @@ func handleBatchAction(w http.ResponseWriter, r *http.Request) {
 	default:
 		writeErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
 	}
+}
+
+// handleServerLogs 处理服务器日志请求
+func handleServerLogs(w http.ResponseWriter, r *http.Request) {
+	if err := ValidateMethod(r, http.MethodGet); err != nil {
+		WriteStandardError(w, "METHOD_NOT_ALLOWED", err.Error(), http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 从URL路径中提取服务器ID
+	pathParts := strings.Split(r.URL.Path, "/")
+	if len(pathParts) < 4 {
+		WriteStandardError(w, "INVALID_PATH", "Invalid server ID", http.StatusBadRequest)
+		return
+	}
+	serverID := pathParts[3]
+
+	// 获取行数参数
+	linesStr := r.URL.Query().Get("lines")
+	lines := 100 // 默认100行
+	if linesStr != "" {
+		if parsedLines, err := strconv.Atoi(linesStr); err == nil && parsedLines > 0 {
+			lines = parsedLines
+		}
+	}
+
+	// 获取服务器日志
+	logs, err := server.GetServerLogs(serverID, lines)
+	if err != nil {
+		WriteStandardError(w, "GET_LOGS_FAILED", fmt.Sprintf("Failed to get logs: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	// 转换为结构化格式
+	var logEntries []map[string]interface{}
+	for _, logLine := range logs {
+		logEntries = append(logEntries, map[string]interface{}{
+			"message":   logLine,
+			"level":     "INFO", // 简化处理，实际可以解析日志级别
+			"timestamp": time.Now(), // 简化处理，实际应该解析时间戳
+		})
+	}
+
+	WriteStandardResponse(w, logEntries)
+}
+
+// handleServerCommand 处理服务器命令请求
+func handleServerCommand(w http.ResponseWriter, r *http.Request) {
+	if err := ValidateMethod(r, http.MethodPost); err != nil {
+		WriteStandardError(w, "METHOD_NOT_ALLOWED", err.Error(), http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 从URL路径中提取服务器ID
+	pathParts := strings.Split(r.URL.Path, "/")
+	if len(pathParts) < 4 {
+		WriteStandardError(w, "INVALID_PATH", "Invalid server ID", http.StatusBadRequest)
+		return
+	}
+	serverID := pathParts[3]
+
+	// 解析请求体
+	var req struct {
+		Command string `json:"command"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteStandardError(w, "INVALID_JSON", "Invalid JSON format", http.StatusBadRequest)
+		return
+	}
+
+	// 验证命令
+	if err := utils.ValidateRequired("command", req.Command); err != nil {
+		if valErr, ok := err.(utils.ValidationError); ok {
+			WriteStandardError(w, "VALIDATION_FAILED", valErr.Message, http.StatusBadRequest)
+			return
+		}
+	}
+
+	// 发送命令到服务器
+	err := server.SendCommand(serverID, req.Command)
+	if err != nil {
+		WriteStandardError(w, "SEND_COMMAND_FAILED", fmt.Sprintf("Failed to send command: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	WriteStandardResponse(w, map[string]string{"status": "success"})
 }
 
 // writeJSON 写入JSON数据
