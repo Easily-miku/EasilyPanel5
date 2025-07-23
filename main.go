@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"easilypanel5/api"
+	"easilypanel5/auth"
 	"easilypanel5/config"
 	"easilypanel5/core"
 	"easilypanel5/frp"
@@ -40,6 +41,10 @@ func main() {
 	// 初始化下载管理器
 	core.InitDownloadManager()
 
+	// 初始化认证系统
+	authService := auth.NewAuthService("data/auth")
+	authHandlers := auth.NewAuthHandlers(authService)
+
 	// 启动进程守护管理器
 	daemon := server.GetDaemon()
 	if err := daemon.Start(); err != nil {
@@ -60,7 +65,7 @@ func main() {
 	}
 
 	// 设置路由
-	router := api.SetupRoutes()
+	router := api.SetupRoutes(authHandlers)
 
 	// 获取端口
 	port := os.Getenv("PORT")

@@ -5,253 +5,261 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>EasilyPanel5 - Minecraft服务器管理面板</title>
     <link rel="stylesheet" href="/static/css/style.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@mdi/font@7.2.96/css/materialdesignicons.min.css">
 </head>
 <body>
-    <div class="container">
-        <!-- 头部 -->
-        <header class="header">
-            <div class="header-left">
-                <h1 class="logo">EasilyPanel5</h1>
-                <span class="version">v1.0.0</span>
-            </div>
-            <div class="header-right">
-                <div class="java-status" id="java-status">
-                    <span class="status-icon">☕</span>
-                    <span class="status-text">检测Java环境中...</span>
+    <!-- 主应用容器 -->
+    <div class="app-container" id="app">
+        <!-- 左侧导航栏 -->
+        <nav class="sidebar" id="sidebar">
+            <div class="sidebar-content">
+                <!-- 主要导航 -->
+                <div class="nav-section">
+                    <div class="nav-section-title">主要功能</div>
+                    <div class="nav-items">
+                        <a href="#dashboard" class="nav-item active" data-page="dashboard" data-tooltip="仪表盘">
+                            <i class="mdi mdi-view-dashboard"></i>
+                            <span class="nav-text">仪表盘</span>
+                        </a>
+                        <a href="#servers" class="nav-item" data-page="servers" data-tooltip="实例管理">
+                            <i class="mdi mdi-server"></i>
+                            <span class="nav-text">实例管理</span>
+                        </a>
+                        <a href="#templates" class="nav-item" data-page="templates" data-tooltip="服务端市场">
+                            <i class="mdi mdi-store"></i>
+                            <span class="nav-text">服务端市场</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 网络功能 -->
+                <div class="nav-section">
+                    <div class="nav-section-title">网络功能</div>
+                    <div class="nav-items">
+                        <a href="#frp" class="nav-item" data-page="frp" data-tooltip="内网穿透">
+                            <i class="mdi mdi-tunnel"></i>
+                            <span class="nav-text">内网穿透</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 系统管理 -->
+                <div class="nav-section">
+                    <div class="nav-section-title">系统管理</div>
+                    <div class="nav-items">
+                        <a href="#files" class="nav-item" data-page="files" data-tooltip="文件管理">
+                            <i class="mdi mdi-folder"></i>
+                            <span class="nav-text">文件管理</span>
+                        </a>
+                        <a href="#monitoring" class="nav-item" data-page="monitoring" data-tooltip="监控面板">
+                            <i class="mdi mdi-chart-line"></i>
+                            <span class="nav-text">监控面板</span>
+                        </a>
+                        <a href="#settings" class="nav-item" data-page="settings" data-tooltip="系统设置">
+                            <i class="mdi mdi-cog"></i>
+                            <span class="nav-text">系统设置</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 安全设置 -->
+                <div class="nav-section">
+                    <div class="nav-section-title">安全设置</div>
+                    <div class="nav-items">
+                        <a href="#auth" class="nav-item" data-page="auth" data-tooltip="双因素认证">
+                            <i class="mdi mdi-shield-account"></i>
+                            <span class="nav-text">双因素认证</span>
+                        </a>
+                    </div>
                 </div>
             </div>
-        </header>
 
-        <!-- 导航栏 -->
-        <nav class="nav-tabs">
-            <button class="tab-btn active" data-tab="servers">
-                <span class="tab-icon">🖥️</span>
-                服务器管理
-            </button>
-            <button class="tab-btn" data-tab="download">
-                <span class="tab-icon">📥</span>
-                核心下载
-            </button>
-            <button class="tab-btn" data-tab="settings">
-                <span class="tab-icon">⚙️</span>
-                设置
-            </button>
+            <!-- 侧边栏底部 -->
+            <div class="sidebar-footer">
+                <div class="user-info">
+                    <div class="user-avatar">
+                        <i class="mdi mdi-account"></i>
+                    </div>
+                    <div class="user-details">
+                        <div class="user-name">管理员</div>
+                        <div class="user-role">系统管理员</div>
+                    </div>
+                </div>
+            </div>
         </nav>
 
-        <!-- 主内容区 -->
+        <!-- 主内容区域 -->
         <main class="main-content">
-            <!-- 服务器管理页面 -->
-            <div class="tab-content active" id="servers">
-                <div class="content-header">
-                    <h2>服务器管理</h2>
-                    <button class="btn btn-primary" id="create-server-btn">
-                        <span class="btn-icon">➕</span>
-                        创建服务器
-                    </button>
+            <!-- 顶部状态栏 -->
+            <header class="top-bar">
+                <div class="top-bar-left">
+                    <div class="app-title">
+                        <h1>EasilyPanel5</h1>
+                        <span class="version">v1.1.0</span>
+                    </div>
                 </div>
-                
-                <div class="server-list" id="server-list">
-                    <div class="loading">加载服务器列表中...</div>
+                <div class="top-bar-center">
+                    <div class="breadcrumb" id="breadcrumb">
+                        <span class="breadcrumb-item active">仪表盘</span>
+                    </div>
                 </div>
-            </div>
-
-            <!-- 核心下载页面 -->
-            <div class="tab-content" id="download">
-                <div class="content-header">
-                    <h2>核心下载</h2>
-                </div>
-                
-                <div class="download-section">
-                    <div class="download-form">
-                        <div class="form-group">
-                            <label for="core-type">核心类型:</label>
-                            <select id="core-type" class="form-control">
-                                <option value="">选择核心类型...</option>
-                            </select>
+                <div class="top-bar-right">
+                    <div class="status-indicators">
+                        <div class="connection-status" id="connectionStatus">
+                            <i class="mdi mdi-circle"></i>
+                            <span>连接中...</span>
                         </div>
-                        
-                        <div class="form-group">
-                            <label for="mc-version">MC版本:</label>
-                            <select id="mc-version" class="form-control" disabled>
-                                <option value="">请先选择核心类型</option>
-                            </select>
-                        </div>
-                        
-                        <div class="form-group">
-                            <label for="core-version">核心版本:</label>
-                            <select id="core-version" class="form-control" disabled>
-                                <option value="">请先选择MC版本</option>
-                            </select>
-                        </div>
-                        
-                        <button id="download-btn" class="btn btn-primary" disabled>
-                            <span class="btn-icon">📥</span>
-                            下载核心
+                        <button class="theme-toggle" id="themeToggle" title="切换主题">
+                            <i class="mdi mdi-theme-light-dark"></i>
+                        </button>
+                        <button class="sidebar-toggle" id="sidebarToggle" title="固定侧边栏">
+                            <i class="mdi mdi-pin"></i>
                         </button>
                     </div>
-                    
-                    <div class="download-progress" id="download-progress" style="display: none;">
-                        <div class="progress-info">
-                            <span class="progress-text">下载中...</span>
-                            <span class="progress-percent">0%</span>
-                        </div>
-                        <div class="progress-bar">
-                            <div class="progress-fill" style="width: 0%"></div>
-                        </div>
-                        <div class="progress-details">
-                            <span class="download-speed">0 KB/s</span>
-                            <span class="download-size">0 / 0 MB</span>
-                        </div>
-                    </div>
                 </div>
-            </div>
+            </header>
 
-            <!-- 设置页面 -->
-            <div class="tab-content" id="settings">
-                <div class="content-header">
-                    <h2>设置</h2>
-                </div>
-                
-                <div class="settings-section">
-                    <div class="setting-group">
-                        <h3>Java环境配置</h3>
-                        <div class="form-group">
-                            <label for="java-path">Java路径:</label>
-                            <div class="input-group">
-                                <input type="text" id="java-path" class="form-control" placeholder="Java可执行文件路径">
-                                <button id="detect-java-btn" class="btn btn-secondary">自动检测</button>
+            <!-- 页面内容区域 -->
+            <div class="page-content" id="pageContent">
+                <!-- 仪表盘页面 -->
+                <div class="page active" id="dashboard-page">
+                    <div class="page-header">
+                        <h2>系统概览</h2>
+                        <p>EasilyPanel5 服务器管理面板</p>
+                    </div>
+                    
+                    <div class="dashboard-grid">
+                        <!-- 系统状态卡片 -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>系统状态</h3>
+                                <i class="mdi mdi-monitor-dashboard"></i>
+                            </div>
+                            <div class="card-content">
+                                <div class="status-grid">
+                                    <div class="status-item">
+                                        <span class="status-label">Java环境</span>
+                                        <span class="status-value" id="javaStatus">检测中...</span>
+                                    </div>
+                                    <div class="status-item">
+                                        <span class="status-label">守护进程</span>
+                                        <span class="status-value" id="daemonStatus">启动中...</span>
+                                    </div>
+                                    <div class="status-item">
+                                        <span class="status-label">FRP状态</span>
+                                        <span class="status-value" id="frpStatus">检查中...</span>
+                                    </div>
+                                </div>
                             </div>
                         </div>
-                        
-                        <div class="form-group">
-                            <label>
-                                <input type="checkbox" id="auto-detect-java"> 
-                                自动检测Java环境
-                            </label>
+
+                        <!-- 服务器统计卡片 -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>服务器统计</h3>
+                                <i class="mdi mdi-server"></i>
+                            </div>
+                            <div class="card-content">
+                                <div class="stats-grid">
+                                    <div class="stat-item">
+                                        <div class="stat-number" id="totalServers">0</div>
+                                        <div class="stat-label">总服务器</div>
+                                    </div>
+                                    <div class="stat-item">
+                                        <div class="stat-number" id="runningServers">0</div>
+                                        <div class="stat-label">运行中</div>
+                                    </div>
+                                    <div class="stat-item">
+                                        <div class="stat-number" id="stoppedServers">0</div>
+                                        <div class="stat-label">已停止</div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                        
-                        <div class="java-info" id="java-info" style="display: none;">
-                            <h4>检测到的Java环境:</h4>
-                            <div class="java-list" id="java-list"></div>
+
+                        <!-- 快速操作卡片 -->
+                        <div class="card">
+                            <div class="card-header">
+                                <h3>快速操作</h3>
+                                <i class="mdi mdi-lightning-bolt"></i>
+                            </div>
+                            <div class="card-content">
+                                <div class="quick-actions">
+                                    <button class="quick-action-btn" data-action="create-server">
+                                        <i class="mdi mdi-plus"></i>
+                                        <span>创建服务器</span>
+                                    </button>
+                                    <button class="quick-action-btn" data-action="start-all">
+                                        <i class="mdi mdi-play"></i>
+                                        <span>启动全部</span>
+                                    </button>
+                                    <button class="quick-action-btn" data-action="backup-all">
+                                        <i class="mdi mdi-backup-restore"></i>
+                                        <span>备份全部</span>
+                                    </button>
+                                    <button class="quick-action-btn" data-action="system-info">
+                                        <i class="mdi mdi-information"></i>
+                                        <span>系统信息</span>
+                                    </button>
+                                </div>
+                            </div>
                         </div>
-                        
-                        <button id="save-java-config" class="btn btn-primary">保存配置</button>
+
+                        <!-- 最近活动卡片 -->
+                        <div class="card full-width">
+                            <div class="card-header">
+                                <h3>最近活动</h3>
+                                <i class="mdi mdi-history"></i>
+                            </div>
+                            <div class="card-content">
+                                <div class="activity-list" id="activityList">
+                                    <div class="activity-item">
+                                        <div class="activity-icon">
+                                            <i class="mdi mdi-information"></i>
+                                        </div>
+                                        <div class="activity-content">
+                                            <div class="activity-title">系统启动</div>
+                                            <div class="activity-time">刚刚</div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 </div>
+
+                <!-- 其他页面将在这里动态加载 -->
+                <div class="page" id="servers-page"></div>
+                <div class="page" id="templates-page"></div>
+                <div class="page" id="frp-page"></div>
+                <div class="page" id="files-page"></div>
+                <div class="page" id="monitoring-page"></div>
+                <div class="page" id="settings-page"></div>
+                <div class="page" id="auth-page"></div>
             </div>
         </main>
-    </div>
 
-    <!-- 服务器控制台模态框 -->
-    <div class="modal" id="console-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <div class="modal-title">
-                    <span class="server-name">服务器控制台</span>
-                    <span class="server-status badge">已停止</span>
-                </div>
-                <button class="modal-close" id="close-console">&times;</button>
-            </div>
-            
-            <div class="modal-body">
-                <div class="console-container">
-                    <div class="console-output" id="console-output">
-                        <div class="console-welcome">
-                            连接到服务器控制台...
-                        </div>
-                    </div>
-                    
-                    <div class="console-input-container">
-                        <input type="text" id="command-input" class="console-input" 
-                               placeholder="输入命令..." disabled>
-                        <button id="send-command" class="btn btn-sm btn-primary" disabled>发送</button>
-                    </div>
-                </div>
-            </div>
-            
-            <div class="modal-footer">
-                <div class="console-controls">
-                    <button id="start-server" class="btn btn-success">
-                        <span class="btn-icon">▶️</span>
-                        启动
-                    </button>
-                    <button id="stop-server" class="btn btn-danger" disabled>
-                        <span class="btn-icon">⏹️</span>
-                        停止
-                    </button>
-                    <button id="restart-server" class="btn btn-warning" disabled>
-                        <span class="btn-icon">🔄</span>
-                        重启
-                    </button>
-                </div>
-                
-                <div class="console-options">
-                    <label>
-                        <input type="checkbox" id="auto-scroll" checked>
-                        自动滚动
-                    </label>
-                    <button id="clear-console" class="btn btn-sm btn-secondary">清空</button>
-                </div>
-            </div>
-        </div>
-    </div>
-
-    <!-- 创建服务器模态框 -->
-    <div class="modal" id="create-server-modal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h3 class="modal-title">创建新服务器</h3>
-                <button class="modal-close" id="close-create-server">&times;</button>
-            </div>
-            
-            <div class="modal-body">
-                <form id="create-server-form">
-                    <div class="form-group">
-                        <label for="server-name">服务器名称:</label>
-                        <input type="text" id="server-name" class="form-control" required>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="server-core-type">核心类型:</label>
-                        <select id="server-core-type" class="form-control" required>
-                            <option value="">选择核心类型...</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="server-mc-version">MC版本:</label>
-                        <select id="server-mc-version" class="form-control" required disabled>
-                            <option value="">请先选择核心类型</option>
-                        </select>
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="server-memory">内存分配 (MB):</label>
-                        <input type="number" id="server-memory" class="form-control" 
-                               value="2048" min="512" max="16384" step="256">
-                    </div>
-                    
-                    <div class="form-group">
-                        <label for="server-port">端口:</label>
-                        <input type="number" id="server-port" class="form-control" 
-                               value="25565" min="1" max="65535">
-                    </div>
-                </form>
-            </div>
-            
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary" id="cancel-create-server">取消</button>
-                <button type="submit" form="create-server-form" class="btn btn-primary">创建服务器</button>
-            </div>
-        </div>
+        <!-- 侧边栏遮罩层（移动端） -->
+        <div class="sidebar-overlay" id="sidebarOverlay"></div>
     </div>
 
     <!-- 通知容器 -->
-    <div class="notifications" id="notifications"></div>
+    <div class="notification-container" id="notificationContainer"></div>
+
+    <!-- 模态框容器 -->
+    <div class="modal-container" id="modalContainer"></div>
 
     <!-- 脚本 -->
-    <!-- 暂时禁用WebSocket -->
-    <!-- <script src="/static/js/websocket.js"></script> -->
+    <script src="/static/js/websocket.js"></script>
+    <script src="/static/js/auth.js"></script>
     <script src="/static/js/app.js"></script>
+    <script src="/static/js/ui.js"></script>
+    <script src="/static/js/pages/auth.js"></script>
+    <script src="/static/js/pages/servers.js"></script>
+    <script src="/static/js/pages/templates.js"></script>
+    <script src="/static/js/pages/frp.js"></script>
+    <script src="/static/js/pages/files.js"></script>
+    <script src="/static/js/pages/monitoring.js"></script>
+    <script src="/static/js/pages/settings.js"></script>
 </body>
 </html>

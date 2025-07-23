@@ -1,0 +1,12 @@
+{
+  "enabled": false,
+  "require_two_factor": false,
+  "session_timeout": 86400000000000,
+  "max_failed_attempts": 5,
+  "lockout_duration": 900000000000,
+  "password_min_length": 8,
+  "password_require_special": true,
+  "backup_codes_count": 10,
+  "totp_issuer": "EasilyPanel5",
+  "jwt_secret": "7ddf18063191119364d9c7204d8f8c0f5d9f31b90480c257dbf8af1a455a3899"
+}

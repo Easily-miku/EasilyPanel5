@@ -5,9 +5,20 @@ import (
 	"path/filepath"
 )
 
+// AuthHandlers 认证处理器接口
+type AuthHandlers interface {
+	RegisterRoutes(mux *http.ServeMux)
+	AuthMiddleware(next http.Handler) http.Handler
+}
+
 // SetupRoutes 设置路由
-func SetupRoutes() *http.ServeMux {
+func SetupRoutes(authHandlers AuthHandlers) http.Handler {
 	mux := http.NewServeMux()
+
+	// 注册认证路由
+	if authHandlers != nil {
+		authHandlers.RegisterRoutes(mux)
+	}
 
 	// 静态文件服务
 	mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("web/static"))))
@@ -51,6 +62,11 @@ func SetupRoutes() *http.ServeMux {
 	
 	// WebSocket
 	mux.HandleFunc("/ws", ServeWS)
+
+	// 如果有认证处理器，应用认证中间件
+	if authHandlers != nil {
+		return authHandlers.AuthMiddleware(mux)
+	}
 
 	return mux
 }

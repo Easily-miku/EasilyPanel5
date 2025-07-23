@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>EasilyPanel5 - Minecraft服务器管理面板</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- 头部 -->
+        <header class="header">
+            <div class="header-left">
+                <h1 class="logo">EasilyPanel5</h1>
+                <span class="version">v1.0.0</span>
+            </div>
+            <div class="header-right">
+                <div class="java-status" id="java-status">
+                    <span class="status-icon">☕</span>
+                    <span class="status-text">检测Java环境中...</span>
+                </div>
+            </div>
+        </header>
+
+        <!-- 导航栏 -->
+        <nav class="nav-tabs">
+            <button class="tab-btn active" data-tab="servers">
+                <span class="tab-icon">🖥️</span>
+                服务器管理
+            </button>
+            <button class="tab-btn" data-tab="download">
+                <span class="tab-icon">📥</span>
+                核心下载
+            </button>
+            <button class="tab-btn" data-tab="settings">
+                <span class="tab-icon">⚙️</span>
+                设置
+            </button>
+        </nav>
+
+        <!-- 主内容区 -->
+        <main class="main-content">
+            <!-- 服务器管理页面 -->
+            <div class="tab-content active" id="servers">
+                <div class="content-header">
+                    <h2>服务器管理</h2>
+                    <button class="btn btn-primary" id="create-server-btn">
+                        <span class="btn-icon">➕</span>
+                        创建服务器
+                    </button>
+                </div>
+                
+                <div class="server-list" id="server-list">
+                    <div class="loading">加载服务器列表中...</div>
+                </div>
+            </div>
+
+            <!-- 核心下载页面 -->
+            <div class="tab-content" id="download">
+                <div class="content-header">
+                    <h2>核心下载</h2>
+                </div>
+                
+                <div class="download-section">
+                    <div class="download-form">
+                        <div class="form-group">
+                            <label for="core-type">核心类型:</label>
+                            <select id="core-type" class="form-control">
+                                <option value="">选择核心类型...</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="mc-version">MC版本:</label>
+                            <select id="mc-version" class="form-control" disabled>
+                                <option value="">请先选择核心类型</option>
+                            </select>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label for="core-version">核心版本:</label>
+                            <select id="core-version" class="form-control" disabled>
+                                <option value="">请先选择MC版本</option>
+                            </select>
+                        </div>
+                        
+                        <button id="download-btn" class="btn btn-primary" disabled>
+                            <span class="btn-icon">📥</span>
+                            下载核心
+                        </button>
+                    </div>
+                    
+                    <div class="download-progress" id="download-progress" style="display: none;">
+                        <div class="progress-info">
+                            <span class="progress-text">下载中...</span>
+                            <span class="progress-percent">0%</span>
+                        </div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-details">
+                            <span class="download-speed">0 KB/s</span>
+                            <span class="download-size">0 / 0 MB</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- 设置页面 -->
+            <div class="tab-content" id="settings">
+                <div class="content-header">
+                    <h2>设置</h2>
+                </div>
+                
+                <div class="settings-section">
+                    <div class="setting-group">
+                        <h3>Java环境配置</h3>
+                        <div class="form-group">
+                            <label for="java-path">Java路径:</label>
+                            <div class="input-group">
+                                <input type="text" id="java-path" class="form-control" placeholder="Java可执行文件路径">
+                                <button id="detect-java-btn" class="btn btn-secondary">自动检测</button>
+                            </div>
+                        </div>
+                        
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" id="auto-detect-java"> 
+                                自动检测Java环境
+                            </label>
+                        </div>
+                        
+                        <div class="java-info" id="java-info" style="display: none;">
+                            <h4>检测到的Java环境:</h4>
+                            <div class="java-list" id="java-list"></div>
+                        </div>
+                        
+                        <button id="save-java-config" class="btn btn-primary">保存配置</button>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- 服务器控制台模态框 -->
+    <div class="modal" id="console-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <div class="modal-title">
+                    <span class="server-name">服务器控制台</span>
+                    <span class="server-status badge">已停止</span>
+                </div>
+                <button class="modal-close" id="close-console">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <div class="console-container">
+                    <div class="console-output" id="console-output">
+                        <div class="console-welcome">
+                            连接到服务器控制台...
+                        </div>
+                    </div>
+                    
+                    <div class="console-input-container">
+                        <input type="text" id="command-input" class="console-input" 
+                               placeholder="输入命令..." disabled>
+                        <button id="send-command" class="btn btn-sm btn-primary" disabled>发送</button>
+                    </div>
+                </div>
+            </div>
+            
+            <div class="modal-footer">
+                <div class="console-controls">
+                    <button id="start-server" class="btn btn-success">
+                        <span class="btn-icon">▶️</span>
+                        启动
+                    </button>
+                    <button id="stop-server" class="btn btn-danger" disabled>
+                        <span class="btn-icon">⏹️</span>
+                        停止
+                    </button>
+                    <button id="restart-server" class="btn btn-warning" disabled>
+                        <span class="btn-icon">🔄</span>
+                        重启
+                    </button>
+                </div>
+                
+                <div class="console-options">
+                    <label>
+                        <input type="checkbox" id="auto-scroll" checked>
+                        自动滚动
+                    </label>
+                    <button id="clear-console" class="btn btn-sm btn-secondary">清空</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 创建服务器模态框 -->
+    <div class="modal" id="create-server-modal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3 class="modal-title">创建新服务器</h3>
+                <button class="modal-close" id="close-create-server">&times;</button>
+            </div>
+            
+            <div class="modal-body">
+                <form id="create-server-form">
+                    <div class="form-group">
+                        <label for="server-name">服务器名称:</label>
+                        <input type="text" id="server-name" class="form-control" required>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="server-core-type">核心类型:</label>
+                        <select id="server-core-type" class="form-control" required>
+                            <option value="">选择核心类型...</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="server-mc-version">MC版本:</label>
+                        <select id="server-mc-version" class="form-control" required disabled>
+                            <option value="">请先选择核心类型</option>
+                        </select>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="server-memory">内存分配 (MB):</label>
+                        <input type="number" id="server-memory" class="form-control" 
+                               value="2048" min="512" max="16384" step="256">
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="server-port">端口:</label>
+                        <input type="number" id="server-port" class="form-control" 
+                               value="25565" min="1" max="65535">
+                    </div>
+                </form>
+            </div>
+            
+            <div class="modal-footer">
+                <button type="button" class="btn btn-secondary" id="cancel-create-server">取消</button>
+                <button type="submit" form="create-server-form" class="btn btn-primary">创建服务器</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 通知容器 -->
+    <div class="notifications" id="notifications"></div>
+
+    <!-- 脚本 -->
+    <!-- 暂时禁用WebSocket -->
+    <!-- <script src="/static/js/websocket.js"></script> -->
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
