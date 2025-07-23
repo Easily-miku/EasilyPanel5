@@ -1,0 +1,615 @@
+/* 基础样式 */
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+    line-height: 1.6;
+}
+
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    background: white;
+    min-height: 100vh;
+    box-shadow: 0 0 20px rgba(0,0,0,0.1);
+}
+
+/* 头部样式 */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1rem 2rem;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    color: white;
+}
+
+.header-left {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.logo {
+    font-size: 1.8rem;
+    font-weight: bold;
+}
+
+.version {
+    background: rgba(255,255,255,0.2);
+    padding: 0.2rem 0.5rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+}
+
+.java-status {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    background: rgba(255,255,255,0.1);
+    padding: 0.5rem 1rem;
+    border-radius: 20px;
+    font-size: 0.9rem;
+}
+
+.status-icon {
+    font-size: 1.2rem;
+}
+
+/* 导航栏样式 */
+.nav-tabs {
+    display: flex;
+    background: #f8f9fa;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.tab-btn {
+    background: none;
+    border: none;
+    padding: 1rem 2rem;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    font-size: 1rem;
+    color: #6c757d;
+    transition: all 0.3s ease;
+    border-bottom: 3px solid transparent;
+}
+
+.tab-btn:hover {
+    background: #e9ecef;
+    color: #495057;
+}
+
+.tab-btn.active {
+    color: #667eea;
+    border-bottom-color: #667eea;
+    background: white;
+}
+
+.tab-icon {
+    font-size: 1.2rem;
+}
+
+/* 主内容区样式 */
+.main-content {
+    padding: 2rem;
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+.content-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 2rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #f1f3f4;
+}
+
+.content-header h2 {
+    color: #333;
+    font-size: 1.5rem;
+}
+
+/* 按钮样式 */
+.btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.75rem 1.5rem;
+    border: none;
+    border-radius: 6px;
+    font-size: 0.9rem;
+    font-weight: 500;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-decoration: none;
+}
+
+.btn:disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.btn-primary {
+    background: #667eea;
+    color: white;
+}
+
+.btn-primary:hover:not(:disabled) {
+    background: #5a6fd8;
+    transform: translateY(-1px);
+}
+
+.btn-secondary {
+    background: #6c757d;
+    color: white;
+}
+
+.btn-secondary:hover:not(:disabled) {
+    background: #5a6268;
+}
+
+.btn-success {
+    background: #28a745;
+    color: white;
+}
+
+.btn-success:hover:not(:disabled) {
+    background: #218838;
+}
+
+.btn-danger {
+    background: #dc3545;
+    color: white;
+}
+
+.btn-danger:hover:not(:disabled) {
+    background: #c82333;
+}
+
+.btn-warning {
+    background: #ffc107;
+    color: #212529;
+}
+
+.btn-warning:hover:not(:disabled) {
+    background: #e0a800;
+}
+
+.btn-sm {
+    padding: 0.5rem 1rem;
+    font-size: 0.8rem;
+}
+
+.btn-icon {
+    font-size: 1rem;
+}
+
+/* 表单样式 */
+.form-group {
+    margin-bottom: 1.5rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: 500;
+    color: #555;
+}
+
+.form-control {
+    width: 100%;
+    padding: 0.75rem;
+    border: 2px solid #e1e5e9;
+    border-radius: 6px;
+    font-size: 1rem;
+    transition: border-color 0.3s ease;
+}
+
+.form-control:focus {
+    outline: none;
+    border-color: #667eea;
+    box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.form-control:disabled {
+    background-color: #f8f9fa;
+    color: #6c757d;
+}
+
+.input-group {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.input-group .form-control {
+    flex: 1;
+}
+
+/* 服务器列表样式 */
+.server-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+    gap: 1.5rem;
+}
+
+.server-card {
+    background: white;
+    border: 2px solid #e1e5e9;
+    border-radius: 12px;
+    padding: 1.5rem;
+    transition: all 0.3s ease;
+}
+
+.server-card:hover {
+    border-color: #667eea;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.server-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 1rem;
+}
+
+.server-name {
+    font-size: 1.2rem;
+    font-weight: bold;
+    color: #333;
+}
+
+.server-info {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 0.5rem;
+    margin-bottom: 1rem;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+.server-actions {
+    display: flex;
+    gap: 0.5rem;
+    flex-wrap: wrap;
+}
+
+/* 状态徽章 */
+.badge {
+    padding: 0.25rem 0.75rem;
+    border-radius: 12px;
+    font-size: 0.8rem;
+    font-weight: 500;
+}
+
+.badge.running {
+    background: #d4edda;
+    color: #155724;
+}
+
+.badge.stopped {
+    background: #f8d7da;
+    color: #721c24;
+}
+
+.badge.crashed {
+    background: #f5c6cb;
+    color: #721c24;
+}
+
+.badge.starting {
+    background: #fff3cd;
+    color: #856404;
+}
+
+.badge.stopping {
+    background: #d1ecf1;
+    color: #0c5460;
+}
+
+/* 下载进度样式 */
+.download-progress {
+    background: #f8f9fa;
+    border: 2px solid #e1e5e9;
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin-top: 1rem;
+}
+
+.progress-info {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.5rem;
+}
+
+.progress-bar {
+    width: 100%;
+    height: 8px;
+    background: #e1e5e9;
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 0.5rem;
+}
+
+.progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #667eea, #764ba2);
+    transition: width 0.3s ease;
+}
+
+.progress-details {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.9rem;
+    color: #666;
+}
+
+/* 模态框样式 */
+.modal {
+    display: none;
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0,0,0,0.5);
+    z-index: 1000;
+}
+
+.modal.show {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.modal-content {
+    background: white;
+    border-radius: 12px;
+    max-width: 90vw;
+    max-height: 90vh;
+    overflow: hidden;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+}
+
+.modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 1.5rem;
+    border-bottom: 1px solid #e1e5e9;
+    background: #f8f9fa;
+}
+
+.modal-title {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    font-size: 1.2rem;
+    font-weight: bold;
+}
+
+.modal-close {
+    background: none;
+    border: none;
+    font-size: 1.5rem;
+    cursor: pointer;
+    color: #666;
+    padding: 0.5rem;
+    border-radius: 4px;
+}
+
+.modal-close:hover {
+    background: #e9ecef;
+}
+
+.modal-body {
+    padding: 1.5rem;
+}
+
+.modal-footer {
+    padding: 1rem 1.5rem;
+    border-top: 1px solid #e1e5e9;
+    background: #f8f9fa;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 1rem;
+}
+
+/* 控制台样式 */
+.console-container {
+    width: 800px;
+    height: 500px;
+    display: flex;
+    flex-direction: column;
+}
+
+.console-output {
+    flex: 1;
+    background: #1e1e1e;
+    color: #ffffff;
+    font-family: 'Consolas', 'Monaco', monospace;
+    font-size: 0.9rem;
+    padding: 1rem;
+    overflow-y: auto;
+    border-radius: 6px 6px 0 0;
+}
+
+.console-input-container {
+    display: flex;
+    gap: 0.5rem;
+    padding: 1rem;
+    background: #2d2d2d;
+    border-radius: 0 0 6px 6px;
+}
+
+.console-input {
+    flex: 1;
+    background: #1e1e1e;
+    color: white;
+    border: 1px solid #444;
+    padding: 0.5rem;
+    border-radius: 4px;
+    font-family: 'Consolas', 'Monaco', monospace;
+}
+
+.console-input:focus {
+    outline: none;
+    border-color: #667eea;
+}
+
+.console-controls {
+    display: flex;
+    gap: 0.5rem;
+}
+
+.console-options {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+/* ANSI颜色样式 */
+.ansi-black { color: #000000; }
+.ansi-red { color: #cd0000; }
+.ansi-green { color: #00cd00; }
+.ansi-yellow { color: #cdcd00; }
+.ansi-blue { color: #0000ee; }
+.ansi-magenta { color: #cd00cd; }
+.ansi-cyan { color: #00cdcd; }
+.ansi-white { color: #e5e5e5; }
+.ansi-bright-black { color: #7f7f7f; }
+.ansi-bright-red { color: #ff0000; }
+.ansi-bright-green { color: #00ff00; }
+.ansi-bright-yellow { color: #ffff00; }
+.ansi-bright-blue { color: #5c5cff; }
+.ansi-bright-magenta { color: #ff00ff; }
+.ansi-bright-cyan { color: #00ffff; }
+.ansi-bright-white { color: #ffffff; }
+.ansi-bold { font-weight: bold; }
+.ansi-dim { opacity: 0.5; }
+.ansi-italic { font-style: italic; }
+.ansi-underline { text-decoration: underline; }
+
+/* 日志级别颜色 */
+.log-error { color: #ff6b6b; }
+.log-warning { color: #feca57; }
+.log-info { color: #48dbfb; }
+.log-debug { color: #ff9ff3; }
+.log-trace { color: #54a0ff; }
+
+/* 通知样式 */
+.notifications {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    z-index: 2000;
+}
+
+.notification {
+    background: white;
+    border-left: 4px solid #667eea;
+    border-radius: 6px;
+    padding: 1rem;
+    margin-bottom: 0.5rem;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+    max-width: 400px;
+    animation: slideIn 0.3s ease;
+}
+
+.notification.success {
+    border-left-color: #28a745;
+}
+
+.notification.error {
+    border-left-color: #dc3545;
+}
+
+.notification.warning {
+    border-left-color: #ffc107;
+}
+
+@keyframes slideIn {
+    from {
+        transform: translateX(100%);
+        opacity: 0;
+    }
+    to {
+        transform: translateX(0);
+        opacity: 1;
+    }
+}
+
+/* 加载状态 */
+.loading {
+    text-align: center;
+    padding: 2rem;
+    color: #666;
+}
+
+/* 响应式设计 */
+@media (max-width: 768px) {
+    .container {
+        margin: 0;
+        box-shadow: none;
+    }
+    
+    .header {
+        padding: 1rem;
+        flex-direction: column;
+        gap: 1rem;
+    }
+    
+    .nav-tabs {
+        overflow-x: auto;
+    }
+    
+    .tab-btn {
+        white-space: nowrap;
+        padding: 1rem;
+    }
+    
+    .main-content {
+        padding: 1rem;
+    }
+    
+    .server-list {
+        grid-template-columns: 1fr;
+    }
+    
+    .console-container {
+        width: 100%;
+        height: 400px;
+    }
+    
+    .modal-content {
+        width: 95vw;
+        margin: 1rem;
+    }
+    
+    .modal-footer {
+        flex-direction: column;
+        align-items: stretch;
+    }
+    
+    .console-controls {
+        justify-content: center;
+    }
+}
