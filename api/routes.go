@@ -39,6 +39,19 @@ func SetupRoutes(authHandlers AuthHandlers) http.Handler {
 	mux.HandleFunc("/api/cores/versions", handleCoresVersions)
 	mux.HandleFunc("/api/cores/download", handleCoresDownload)
 
+	// 插件管理相关
+	mux.HandleFunc("/api/plugins/list", handlePluginsList)
+	mux.HandleFunc("/api/plugins/search", handlePluginsSearch)
+	mux.HandleFunc("/api/plugins/", func(w http.ResponseWriter, r *http.Request) {
+		path := r.URL.Path
+		if strings.HasSuffix(path, "/versions") {
+			handlePluginVersions(w, r)
+		} else {
+			handlePluginInfo(w, r)
+		}
+	})
+	mux.HandleFunc("/api/plugins/download", handlePluginDownload)
+
 	// 服务器管理相关
 	mux.HandleFunc("/api/servers", handleServers)
 

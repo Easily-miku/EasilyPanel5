@@ -13,62 +13,66 @@
         <!-- 左侧导航栏 -->
         <nav class="sidebar" id="sidebar">
             <div class="sidebar-content">
-                <!-- 主要导航 -->
+                <!-- 核心功能 -->
                 <div class="nav-section">
-                    <div class="nav-section-title">主要功能</div>
+                    <div class="nav-section-title">核心功能</div>
                     <div class="nav-items">
                         <a href="#dashboard" class="nav-item active" data-page="dashboard" data-tooltip="仪表盘">
                             <i class="mdi mdi-view-dashboard"></i>
                             <span class="nav-text">仪表盘</span>
                         </a>
-                        <a href="#servers" class="nav-item" data-page="servers" data-tooltip="实例管理">
+                        <a href="#servers" class="nav-item" data-page="servers" data-tooltip="服务器管理">
                             <i class="mdi mdi-server"></i>
-                            <span class="nav-text">实例管理</span>
+                            <span class="nav-text">服务器管理</span>
+                        </a>
+                        <a href="#monitoring" class="nav-item" data-page="monitoring" data-tooltip="性能监控">
+                            <i class="mdi mdi-chart-line"></i>
+                            <span class="nav-text">性能监控</span>
                         </a>
                     </div>
                 </div>
 
-                <!-- 网络功能 -->
+                <!-- 资源管理 -->
                 <div class="nav-section">
-                    <div class="nav-section-title">网络功能</div>
+                    <div class="nav-section-title">资源管理</div>
+                    <div class="nav-items">
+                        <a href="#cores" class="nav-item" data-page="cores" data-tooltip="核心下载">
+                            <i class="mdi mdi-cube-outline"></i>
+                            <span class="nav-text">核心下载</span>
+                        </a>
+                        <a href="#plugins" class="nav-item" data-page="plugins" data-tooltip="插件管理">
+                            <i class="mdi mdi-puzzle"></i>
+                            <span class="nav-text">插件管理</span>
+                        </a>
+                        <a href="#files" class="nav-item" data-page="files" data-tooltip="文件管理">
+                            <i class="mdi mdi-folder"></i>
+                            <span class="nav-text">文件管理</span>
+                        </a>
+                    </div>
+                </div>
+
+                <!-- 网络工具 -->
+                <div class="nav-section">
+                    <div class="nav-section-title">网络工具</div>
                     <div class="nav-items">
                         <a href="#frp" class="nav-item" data-page="frp" data-tooltip="内网穿透">
-                            <i class="mdi mdi-tunnel"></i>
+                            <i class="mdi mdi-network"></i>
                             <span class="nav-text">内网穿透</span>
                         </a>
                     </div>
                 </div>
 
-                <!-- 系统管理 -->
+                <!-- 系统设置 -->
                 <div class="nav-section">
-                    <div class="nav-section-title">系统管理</div>
+                    <div class="nav-section-title">系统设置</div>
                     <div class="nav-items">
-                        <a href="#files" class="nav-item" data-page="files" data-tooltip="文件管理">
-                            <i class="mdi mdi-folder"></i>
-                            <span class="nav-text">文件管理</span>
-                        </a>
-                        <a href="#monitoring" class="nav-item" data-page="monitoring" data-tooltip="监控面板">
-                            <i class="mdi mdi-chart-line"></i>
-                            <span class="nav-text">监控面板</span>
-                        </a>
-                        <a href="#download" class="nav-item" data-page="download" data-tooltip="下载中心">
-                            <i class="mdi mdi-download"></i>
-                            <span class="nav-text">下载中心</span>
-                        </a>
                         <a href="#settings" class="nav-item" data-page="settings" data-tooltip="系统设置">
                             <i class="mdi mdi-cog"></i>
                             <span class="nav-text">系统设置</span>
                         </a>
-                    </div>
-                </div>
-
-                <!-- 安全设置 -->
-                <div class="nav-section">
-                    <div class="nav-section-title">安全设置</div>
-                    <div class="nav-items">
-                        <a href="#auth" class="nav-item" data-page="auth" data-tooltip="双因素认证">
+                        <a href="#auth" class="nav-item" data-page="auth" data-tooltip="安全认证">
                             <i class="mdi mdi-shield-account"></i>
-                            <span class="nav-text">双因素认证</span>
+                            <span class="nav-text">安全认证</span>
                         </a>
                     </div>
                 </div>
@@ -105,10 +109,6 @@
                 </div>
                 <div class="top-bar-right">
                     <div class="status-indicators">
-                        <div class="connection-status" id="connectionStatus">
-                            <i class="mdi mdi-circle"></i>
-                            <span>连接中...</span>
-                        </div>
                         <button class="theme-toggle" id="themeToggle" title="切换主题">
                             <i class="mdi mdi-theme-light-dark"></i>
                         </button>
@@ -230,10 +230,11 @@
 
                 <!-- 其他页面将在这里动态加载 -->
                 <div class="page" id="servers-page"></div>
-                <div class="page" id="frp-page"></div>
+                <div class="page" id="cores-page"></div>
+                <div class="page" id="plugins-page"></div>
                 <div class="page" id="files-page"></div>
                 <div class="page" id="monitoring-page"></div>
-                <div class="page" id="download-page"></div>
+                <div class="page" id="frp-page"></div>
                 <div class="page" id="settings-page"></div>
                 <div class="page" id="auth-page"></div>
             </div>
@@ -257,6 +258,8 @@
     <script src="/static/js/pages/auth.js"></script>
     <script src="/static/js/pages/servers.js"></script>
     <script src="/static/js/pages/templates.js"></script>
+    <script src="/static/js/pages/cores.js"></script>
+    <script src="/static/js/pages/plugins.js"></script>
     <script src="/static/js/pages/frp.js"></script>
     <script src="/static/js/pages/files.js"></script>
     <script src="/static/js/pages/monitoring.js"></script>

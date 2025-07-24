@@ -1,9 +1,12 @@
 package api
 
 import (
+	"bufio"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log"
+	"net"
 	"net/http"
 	"runtime/debug"
 	"strings"
@@ -144,6 +147,14 @@ type responseRecorder struct {
 func (rec *responseRecorder) WriteHeader(code int) {
 	rec.statusCode = code
 	rec.ResponseWriter.WriteHeader(code)
+}
+
+// Hijack 实现 http.Hijacker 接口，支持 WebSocket 升级
+func (rec *responseRecorder) Hijack() (net.Conn, *bufio.ReadWriter, error) {
+	if hijacker, ok := rec.ResponseWriter.(http.Hijacker); ok {
+		return hijacker.Hijack()
+	}
+	return nil, nil, errors.New("ResponseWriter does not implement http.Hijacker")
 }
 
 // ChainMiddleware 中间件链构建器

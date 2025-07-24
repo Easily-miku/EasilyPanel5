@@ -202,6 +202,8 @@ class UIManager {
         const pageNames = {
             'dashboard': '仪表盘',
             'servers': '服务器管理',
+            'cores': '核心下载',
+            'plugins': '插件管理',
             'groups': '服务器分组',
             'frp': '内网穿透',
             'files': '文件管理',
@@ -224,6 +226,12 @@ class UIManager {
                 break;
             case 'servers':
                 this.loadServersPage();
+                break;
+            case 'cores':
+                this.loadCoresPage();
+                break;
+            case 'plugins':
+                this.loadPluginsPage();
                 break;
             case 'groups':
                 this.loadGroupsPage();
@@ -571,6 +579,34 @@ class UIManager {
                     if (authPageManager) {
                         authPageManager.init();
                     }
+                }, 100);
+            }
+        }
+    }
+
+    loadCoresPage() {
+        console.log('加载核心下载页面');
+
+        // 等待核心页面管理器初始化
+        if (window.getCoresPageManager) {
+            const coresPageManager = window.getCoresPageManager();
+            if (coresPageManager) {
+                setTimeout(() => {
+                    coresPageManager.init();
+                }, 100);
+            }
+        }
+    }
+
+    loadPluginsPage() {
+        console.log('加载插件管理页面');
+
+        // 等待插件页面管理器初始化
+        if (window.getPluginsPageManager) {
+            const pluginsPageManager = window.getPluginsPageManager();
+            if (pluginsPageManager) {
+                setTimeout(() => {
+                    pluginsPageManager.init();
                 }, 100);
             }
         }

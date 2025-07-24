@@ -406,21 +406,21 @@ func readLogLines(filename string, lines int) ([]string, error) {
 		buffer = append(chunk, buffer...)
 
 		// 分割行
-		lines := strings.Split(string(buffer), "\n")
+		splitLines := strings.Split(string(buffer), "\n")
 
 		// 如果不是从文件开头开始读取，第一行可能是不完整的
-		if offset > 0 && len(lines) > 0 {
+		if offset > 0 && len(splitLines) > 0 {
 			// 保留第一行作为下次读取的一部分
-			buffer = []byte(lines[0])
-			lines = lines[1:]
+			buffer = []byte(splitLines[0])
+			splitLines = splitLines[1:]
 		} else {
 			buffer = []byte{}
 		}
 
 		// 从后往前添加完整的行
-		for i := len(lines) - 1; i >= 0 && lineCount < lines; i-- {
-			if strings.TrimSpace(lines[i]) != "" {
-				result = append([]string{lines[i]}, result...)
+		for i := len(splitLines) - 1; i >= 0 && lineCount < lines; i-- {
+			if strings.TrimSpace(splitLines[i]) != "" {
+				result = append([]string{splitLines[i]}, result...)
 				lineCount++
 			}
 		}

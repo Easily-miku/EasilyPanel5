@@ -3,7 +3,6 @@ package utils
 import (
 	"fmt"
 	"io"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
@@ -91,12 +90,12 @@ type LogEntry struct {
 
 var (
 	defaultLogger *Logger
-	once          sync.Once
+	loggerOnce    sync.Once
 )
 
 // GetLogger 获取默认日志记录器
 func GetLogger() *Logger {
-	once.Do(func() {
+	loggerOnce.Do(func() {
 		cfg := config.Get()
 		defaultLogger = NewLogger(&LoggerConfig{
 			Level:        ParseLogLevel(cfg.Logging.Level),

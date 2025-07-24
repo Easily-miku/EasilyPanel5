@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"easilypanel5/config"
+	"easilypanel5/core"
 	"easilypanel5/frp"
 	"easilypanel5/server"
 	"easilypanel5/utils"
@@ -969,21 +970,21 @@ func readSystemLogLines(filename string, lines int) ([]string, error) {
 		buffer = append(chunk, buffer...)
 
 		// 分割行
-		lines := strings.Split(string(buffer), "\n")
+		splitLines := strings.Split(string(buffer), "\n")
 
 		// 如果不是从文件开头开始读取，第一行可能是不完整的
-		if offset > 0 && len(lines) > 0 {
+		if offset > 0 && len(splitLines) > 0 {
 			// 保留第一行作为下次读取的一部分
-			buffer = []byte(lines[0])
-			lines = lines[1:]
+			buffer = []byte(splitLines[0])
+			splitLines = splitLines[1:]
 		} else {
 			buffer = []byte{}
 		}
 
 		// 从后往前添加完整的行
-		for i := len(lines) - 1; i >= 0 && lineCount < lines; i-- {
-			if strings.TrimSpace(lines[i]) != "" {
-				result = append([]string{lines[i]}, result...)
+		for i := len(splitLines) - 1; i >= 0 && lineCount < lines; i-- {
+			if strings.TrimSpace(splitLines[i]) != "" {
+				result = append([]string{splitLines[i]}, result...)
 				lineCount++
 			}
 		}
@@ -1044,4 +1045,160 @@ func writeJSON(w http.ResponseWriter, data interface{}) error {
 	encoder := json.NewEncoder(w)
 	encoder.SetIndent("", "  ")
 	return encoder.Encode(data)
+}
+
+// handlePluginsList 处理插件列表查询
+func handlePluginsList(w http.ResponseWriter, r *http.Request) {
+	if err := ValidateMethod(r, http.MethodGet); err != nil {
+		WriteStandardError(w, "METHOD_NOT_ALLOWED", err.Error(), http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 获取查询参数
+	category := r.URL.Query().Get("category")
+	if category == "" {
+		category = "all"
+	}
+
+	pageStr := r.URL.Query().Get("page")
+	page := 1
+	if pageStr != "" {
+		if parsedPage, err := strconv.Atoi(pageStr); err == nil && parsedPage > 0 {
+			page = parsedPage
+		}
+	}
+
+	// 获取插件列表
+	pluginAPI := core.GetPluginAPI()
+	result, err := pluginAPI.GetPluginList(category, page)
+	if err != nil {
+		WriteStandardError(w, "GET_PLUGINS_FAILED", fmt.Sprintf("Failed to get plugins: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	WriteStandardResponse(w, result)
+}
+
+// handlePluginsSearch 处理插件搜索
+func handlePluginsSearch(w http.ResponseWriter, r *http.Request) {
+	if err := ValidateMethod(r, http.MethodGet); err != nil {
+		WriteStandardError(w, "METHOD_NOT_ALLOWED", err.Error(), http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 获取查询参数
+	query := r.URL.Query().Get("q")
+	if query == "" {
+		WriteStandardError(w, "MISSING_QUERY", "Search query is required", http.StatusBadRequest)
+		return
+	}
+
+	category := r.URL.Query().Get("category")
+	if category == "" {
+		category = "all"
+	}
+
+	// 搜索插件
+	pluginAPI := core.GetPluginAPI()
+	result, err := pluginAPI.SearchPlugins(query, category)
+	if err != nil {
+		WriteStandardError(w, "SEARCH_PLUGINS_FAILED", fmt.Sprintf("Failed to search plugins: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	WriteStandardResponse(w, result)
+}
+
+// handlePluginInfo 处理插件详细信息查询
+func handlePluginInfo(w http.ResponseWriter, r *http.Request) {
+	if err := ValidateMethod(r, http.MethodGet); err != nil {
+		WriteStandardError(w, "METHOD_NOT_ALLOWED", err.Error(), http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 从URL路径中提取插件ID
+	pathParts := strings.Split(r.URL.Path, "/")
+	if len(pathParts) < 4 {
+		WriteStandardError(w, "INVALID_PATH", "Invalid plugin ID", http.StatusBadRequest)
+		return
+	}
+	pluginID := pathParts[3]
+
+	// 获取插件信息
+	pluginAPI := core.GetPluginAPI()
+	plugin, err := pluginAPI.GetPluginInfo(pluginID)
+	if err != nil {
+		WriteStandardError(w, "GET_PLUGIN_FAILED", fmt.Sprintf("Failed to get plugin info: %v", err), http.StatusNotFound)
+		return
+	}
+
+	WriteStandardResponse(w, plugin)
+}
+
+// handlePluginVersions 处理插件版本查询
+func handlePluginVersions(w http.ResponseWriter, r *http.Request) {
+	if err := ValidateMethod(r, http.MethodGet); err != nil {
+		WriteStandardError(w, "METHOD_NOT_ALLOWED", err.Error(), http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 从URL路径中提取插件ID
+	pathParts := strings.Split(r.URL.Path, "/")
+	if len(pathParts) < 5 {
+		WriteStandardError(w, "INVALID_PATH", "Invalid plugin ID", http.StatusBadRequest)
+		return
+	}
+	pluginID := pathParts[3]
+
+	// 获取插件版本
+	pluginAPI := core.GetPluginAPI()
+	versions, err := pluginAPI.GetPluginVersions(pluginID)
+	if err != nil {
+		WriteStandardError(w, "GET_VERSIONS_FAILED", fmt.Sprintf("Failed to get plugin versions: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	WriteStandardResponse(w, versions)
+}
+
+// handlePluginDownload 处理插件下载
+func handlePluginDownload(w http.ResponseWriter, r *http.Request) {
+	if err := ValidateMethod(r, http.MethodPost); err != nil {
+		WriteStandardError(w, "METHOD_NOT_ALLOWED", err.Error(), http.StatusMethodNotAllowed)
+		return
+	}
+
+	// 解析请求体
+	var req struct {
+		PluginID string `json:"plugin_id"`
+		Version  string `json:"version"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		WriteStandardError(w, "INVALID_JSON", "Invalid JSON format", http.StatusBadRequest)
+		return
+	}
+
+	// 验证参数
+	if req.PluginID == "" {
+		WriteStandardError(w, "MISSING_PLUGIN_ID", "Plugin ID is required", http.StatusBadRequest)
+		return
+	}
+
+	if req.Version == "" {
+		WriteStandardError(w, "MISSING_VERSION", "Version is required", http.StatusBadRequest)
+		return
+	}
+
+	// 下载插件
+	pluginAPI := core.GetPluginAPI()
+	downloadURL, err := pluginAPI.DownloadPlugin(req.PluginID, req.Version)
+	if err != nil {
+		WriteStandardError(w, "DOWNLOAD_FAILED", fmt.Sprintf("Failed to download plugin: %v", err), http.StatusInternalServerError)
+		return
+	}
+
+	WriteStandardResponse(w, map[string]string{
+		"download_url": downloadURL,
+		"status":       "ready",
+	})
 }
