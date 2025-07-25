@@ -4,8 +4,10 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"time"
 
@@ -277,6 +279,11 @@ func createJavaMenu() *menu.Menu {
 		menu.NewMenuItem("list", "Java列表", "查看所有检测到的Java版本").
 			WithHandler(func() error {
 				return handleJavaList()
+			}),
+
+		menu.NewMenuItem("add", "手动添加Java", "手动添加Java环境路径").
+			WithHandler(func() error {
+				return handleJavaAdd()
 			}),
 
 		menu.NewMenuItem("install", "安装Java", "下载并安装Java运行环境").
@@ -990,6 +997,73 @@ func handleJavaDetect() error {
 
 func handleJavaList() error {
 	return handleJavaDetect()
+}
+
+func handleJavaAdd() error {
+	fmt.Println("=== 手动添加Java ===")
+
+	scanner := bufio.NewScanner(os.Stdin)
+
+	fmt.Println("请输入JDK的bin文件夹路径")
+	fmt.Println("示例:")
+	fmt.Println("  Linux/macOS: /usr/lib/jvm/java-17-openjdk/bin")
+	fmt.Println("  Windows: C:\\Program Files\\Java\\jdk-17\\bin")
+	fmt.Println()
+
+	fmt.Print("JDK bin路径: ")
+	if !scanner.Scan() {
+		return fmt.Errorf("读取输入失败")
+	}
+
+	binPath := strings.TrimSpace(scanner.Text())
+	if binPath == "" {
+		fmt.Println("操作已取消")
+		return nil
+	}
+
+	// 验证路径是否存在
+	if _, err := os.Stat(binPath); os.IsNotExist(err) {
+		return fmt.Errorf("路径不存在: %s", binPath)
+	}
+
+	// 构建java可执行文件路径
+	var javaPath string
+	if runtime.GOOS == "windows" {
+		javaPath = filepath.Join(binPath, "java.exe")
+	} else {
+		javaPath = filepath.Join(binPath, "java")
+	}
+
+	// 验证java可执行文件是否存在
+	if _, err := os.Stat(javaPath); os.IsNotExist(err) {
+		return fmt.Errorf("在指定路径中未找到java可执行文件: %s", javaPath)
+	}
+
+	fmt.Printf("找到Java可执行文件: %s\n", javaPath)
+	fmt.Println("正在验证Java版本...")
+
+	// 创建Java管理器
+	manager := java.NewManager("./data/configs")
+
+	// 尝试添加Java
+	addedJava, err := manager.AddJava(javaPath)
+	if err != nil {
+		if strings.Contains(err.Error(), "Java已存在") {
+			fmt.Printf("✓ Java已存在于列表中: %s (版本 %s)\n", addedJava.Path, addedJava.Version)
+			return nil
+		}
+		return fmt.Errorf("添加Java失败: %w", err)
+	}
+
+	fmt.Printf("✓ Java添加成功!\n")
+	fmt.Printf("  路径: %s\n", addedJava.Path)
+	fmt.Printf("  版本: %s\n", addedJava.Version)
+
+	// 显示当前Java列表
+	fmt.Println("\n当前Java列表:")
+	manager.PrintJavaList()
+
+	return nil
 }
 
 func handleFRPSetup() error {
@@ -1740,8 +1814,23 @@ func handleCreateInstanceFromDownload(filePath, serverType, version string) erro
 		return fmt.Errorf("创建实例失败: %w", err)
 	}
 
-	// 设置服务端文件路径
-	inst.ServerJar = filePath
+	// 复制服务端文件到实例目录
+	instanceDir := inst.GetWorkDir("./data/instances")
+	if err := os.MkdirAll(instanceDir, 0755); err != nil {
+		return fmt.Errorf("创建实例目录失败: %w", err)
+	}
+
+	// 获取原文件名
+	originalFileName := filepath.Base(filePath)
+	targetFilePath := filepath.Join(instanceDir, originalFileName)
+
+	fmt.Printf("正在复制服务端文件到实例目录...\n")
+	if err := copyFile(filePath, targetFilePath); err != nil {
+		return fmt.Errorf("复制服务端文件失败: %w", err)
+	}
+
+	// 设置服务端文件路径为实例目录中的文件
+	inst.ServerJar = originalFileName // 只保存文件名，因为工作目录已经设置
 	if err := manager.UpdateInstance(inst); err != nil {
 		return fmt.Errorf("保存实例配置失败: %w", err)
 	}
@@ -2041,10 +2130,11 @@ func handleEditInstanceConfig(manager *instance.Manager, inst *instance.Instance
 		fmt.Println("2. 最小内存")
 		fmt.Println("3. Java参数")
 		fmt.Println("4. 服务器参数")
-		fmt.Println("5. 自动启动")
-		fmt.Println("6. 自动重启")
+		fmt.Println("5. 启动命令")
+		fmt.Println("6. 自动启动")
+		fmt.Println("7. 自动重启")
 		fmt.Println("0. 保存并返回")
-		fmt.Print("请选择要编辑的配置 (0-6): ")
+		fmt.Print("请选择要编辑的配置 (0-7): ")
 
 		if !scanner.Scan() {
 			return fmt.Errorf("读取输入失败")
@@ -2102,6 +2192,9 @@ func handleEditInstanceConfig(manager *instance.Manager, inst *instance.Instance
 			}
 
 		case "5":
+			return handleEditStartCommand(inst, scanner)
+
+		case "6":
 			fmt.Printf("当前自动启动: %t\n", inst.AutoStart)
 			fmt.Print("是否启用自动启动? (y/N): ")
 			if !scanner.Scan() {
@@ -2111,7 +2204,7 @@ func handleEditInstanceConfig(manager *instance.Manager, inst *instance.Instance
 			inst.AutoStart = (newValue == "y" || newValue == "yes")
 			fmt.Printf("✓ 自动启动已设置为: %t\n", inst.AutoStart)
 
-		case "6":
+		case "7":
 			fmt.Printf("当前自动重启: %t\n", inst.AutoRestart)
 			fmt.Print("是否启用自动重启? (y/N): ")
 			if !scanner.Scan() {
@@ -2133,6 +2226,136 @@ func handleEditInstanceConfig(manager *instance.Manager, inst *instance.Instance
 			fmt.Println("无效选择")
 		}
 	}
+}
+
+// handleEditStartCommand 编辑启动命令
+func handleEditStartCommand(inst *instance.Instance, scanner *bufio.Scanner) error {
+	fmt.Println("\n=== 编辑启动命令 ===")
+
+	// 显示当前状态
+	if inst.UseCustomCmd && inst.StartCmd != "" {
+		fmt.Printf("当前使用自定义启动命令: %s\n", inst.StartCmd)
+	} else {
+		fmt.Println("当前使用默认启动命令 (java -jar)")
+	}
+
+	fmt.Println("\n启动命令选项:")
+	fmt.Println("1. 使用默认启动命令 (java -jar)")
+	fmt.Println("2. 设置自定义启动命令")
+	fmt.Println("3. 查看当前完整启动命令")
+	fmt.Println("0. 返回")
+	fmt.Print("请选择 (0-3): ")
+
+	if !scanner.Scan() {
+		return fmt.Errorf("读取输入失败")
+	}
+
+	choice := strings.TrimSpace(scanner.Text())
+
+	switch choice {
+	case "1":
+		// 使用默认启动命令
+		inst.UseCustomCmd = false
+		inst.StartCmd = ""
+		fmt.Println("✓ 已设置为使用默认启动命令")
+
+	case "2":
+		// 设置自定义启动命令
+		fmt.Println("\n自定义启动命令说明:")
+		fmt.Println("- 可以使用任意命令替代默认的 java -jar")
+		fmt.Println("- 支持完整的命令行参数")
+		fmt.Println("- 工作目录会自动设置为实例目录")
+		fmt.Println("- 示例: python3 server.py")
+		fmt.Println("- 示例: ./bedrock_server")
+		fmt.Println("- 示例: java -Xmx2G -Xms1G -jar server.jar nogui")
+		fmt.Println()
+
+		if inst.StartCmd != "" {
+			fmt.Printf("当前自定义命令: %s\n", inst.StartCmd)
+		}
+
+		fmt.Print("请输入新的启动命令 (留空取消): ")
+		if !scanner.Scan() {
+			return fmt.Errorf("读取输入失败")
+		}
+
+		newCmd := strings.TrimSpace(scanner.Text())
+		if newCmd != "" {
+			inst.StartCmd = newCmd
+			inst.UseCustomCmd = true
+			fmt.Printf("✓ 自定义启动命令已设置为: %s\n", newCmd)
+		} else {
+			fmt.Println("操作已取消")
+		}
+
+	case "3":
+		// 查看当前完整启动命令
+		fmt.Println("\n当前完整启动命令:")
+		if inst.UseCustomCmd && inst.StartCmd != "" {
+			fmt.Printf("自定义命令: %s\n", inst.StartCmd)
+		} else {
+			// 显示默认命令（需要模拟生成）
+			defaultCmd := fmt.Sprintf("java -Xmx%s -Xms%s",
+				getMemoryOrDefault(inst.MaxMemory, "1G"),
+				getMemoryOrDefault(inst.MinMemory, "512M"))
+
+			if len(inst.JavaArgs) > 0 {
+				defaultCmd += " " + strings.Join(inst.JavaArgs, " ")
+			}
+
+			defaultCmd += " -jar " + inst.ServerJar
+
+			if len(inst.ServerArgs) > 0 {
+				defaultCmd += " " + strings.Join(inst.ServerArgs, " ")
+			}
+
+			fmt.Printf("默认命令: %s\n", defaultCmd)
+		}
+
+	case "0":
+		return nil
+
+	default:
+		fmt.Println("无效选择")
+	}
+
+	return nil
+}
+
+// getMemoryOrDefault 获取内存设置或默认值
+func getMemoryOrDefault(memory, defaultValue string) string {
+	if memory != "" {
+		return memory
+	}
+	return defaultValue
+}
+
+// copyFile 复制文件
+func copyFile(src, dst string) error {
+	sourceFile, err := os.Open(src)
+	if err != nil {
+		return fmt.Errorf("打开源文件失败: %w", err)
+	}
+	defer sourceFile.Close()
+
+	destFile, err := os.Create(dst)
+	if err != nil {
+		return fmt.Errorf("创建目标文件失败: %w", err)
+	}
+	defer destFile.Close()
+
+	_, err = io.Copy(destFile, sourceFile)
+	if err != nil {
+		return fmt.Errorf("复制文件内容失败: %w", err)
+	}
+
+	// 确保数据写入磁盘
+	err = destFile.Sync()
+	if err != nil {
+		return fmt.Errorf("同步文件失败: %w", err)
+	}
+
+	return nil
 }
 
 func handleViewInstanceLogs(inst *instance.Instance) error {

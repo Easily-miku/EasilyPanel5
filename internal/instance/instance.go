@@ -45,7 +45,8 @@ type Instance struct {
 	JavaPath    string   `json:"java_path"`
 	JavaArgs    []string `json:"java_args"`
 	ServerArgs  []string `json:"server_args"`
-	StartCmd    string   `json:"start_cmd,omitempty"` // 自定义启动命令（空白实例）
+	StartCmd    string   `json:"start_cmd,omitempty"` // 自定义启动命令（覆盖默认启动方式）
+	UseCustomCmd bool    `json:"use_custom_cmd"`     // 是否使用自定义启动命令
 	
 	// Minecraft特定配置
 	MCVersion   string `json:"mc_version,omitempty"`
@@ -167,6 +168,17 @@ func (i *Instance) UpdateMemorySettings(minMem, maxMem string) {
 
 // GetStartCommand 获取启动命令
 func (i *Instance) GetStartCommand() (string, []string, error) {
+	// 如果启用了自定义启动命令，优先使用自定义命令
+	if i.UseCustomCmd && i.StartCmd != "" {
+		// 解析自定义启动命令
+		parts := strings.Fields(i.StartCmd)
+		if len(parts) == 0 {
+			return "", nil, fmt.Errorf("自定义启动命令为空")
+		}
+		return parts[0], parts[1:], nil
+	}
+
+	// 空白实例必须使用自定义启动命令
 	if i.Type == TypeBlank {
 		if i.StartCmd == "" {
 			return "", nil, fmt.Errorf("空白实例未设置启动命令")
@@ -178,21 +190,21 @@ func (i *Instance) GetStartCommand() (string, []string, error) {
 		}
 		return parts[0], parts[1:], nil
 	}
-	
-	// Minecraft实例
+
+	// Minecraft实例使用默认Java启动方式
 	if i.JavaPath == "" {
 		return "", nil, fmt.Errorf("未设置Java路径")
 	}
-	
+
 	if i.ServerJar == "" {
 		return "", nil, fmt.Errorf("未设置服务器JAR文件")
 	}
-	
+
 	var args []string
 	args = append(args, i.JavaArgs...)
 	args = append(args, "-jar", i.ServerJar)
 	args = append(args, i.ServerArgs...)
-	
+
 	return i.JavaPath, args, nil
 }
 

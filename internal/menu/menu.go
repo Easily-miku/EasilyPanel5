@@ -103,22 +103,22 @@ func (ms *MenuSystem) displayMenu() {
 func (ms *MenuSystem) displayHeader() {
 	title := ms.currentMenu.Title
 
-	fmt.Println(ColorCyan + "╔" + strings.Repeat("═", MenuWidth-2) + "╗" + ColorReset)
-	fmt.Printf(ColorCyan + "║" + ColorBold + "%s" + ColorReset + ColorCyan + "║\n" + ColorReset, ms.centerText(title, MenuWidth-2))
+	fmt.Println(ColorCyan + "+" + strings.Repeat("-", MenuWidth-2) + "+" + ColorReset)
+	fmt.Printf(ColorCyan + "|" + ColorBold + "%s" + ColorReset + ColorCyan + "|\n" + ColorReset, ms.centerText(title, MenuWidth-2))
 
 	if ms.currentMenu.Description != "" {
-		fmt.Printf(ColorCyan + "║" + ColorDim + "%s" + ColorReset + ColorCyan + "║\n" + ColorReset, ms.centerText(ms.currentMenu.Description, MenuWidth-2))
+		fmt.Printf(ColorCyan + "|" + ColorDim + "%s" + ColorReset + ColorCyan + "|\n" + ColorReset, ms.centerText(ms.currentMenu.Description, MenuWidth-2))
 	}
 
-	fmt.Println(ColorCyan + "╠" + strings.Repeat("═", MenuWidth-2) + "╣" + ColorReset)
+	fmt.Println(ColorCyan + "+" + strings.Repeat("-", MenuWidth-2) + "+" + ColorReset)
 }
 
 // displayBreadcrumb 显示面包屑导航
 func (ms *MenuSystem) displayBreadcrumb() {
 	if len(ms.currentMenu.Breadcrumb) > 1 {
 		breadcrumbText := "位置: " + strings.Join(ms.currentMenu.Breadcrumb, " > ")
-		fmt.Printf(ColorCyan + "║ " + ColorYellow + "%-*s" + ColorCyan + " ║\n" + ColorReset, MenuWidth-4, breadcrumbText)
-		fmt.Println(ColorCyan + "╠" + strings.Repeat("═", MenuWidth-2) + "╣" + ColorReset)
+		fmt.Printf(ColorCyan + "| " + ColorYellow + "%-*s" + ColorCyan + " |\n" + ColorReset, MenuWidth-4, breadcrumbText)
+		fmt.Println(ColorCyan + "+" + strings.Repeat("-", MenuWidth-2) + "+" + ColorReset)
 	}
 }
 
@@ -153,32 +153,47 @@ func (ms *MenuSystem) displayMenuItems() {
 			plainLine += fmt.Sprintf(" [%s]", status)
 		}
 
-		fmt.Printf(ColorCyan + "║" + ColorReset + " %-*s " + ColorCyan + "║\n" + ColorReset, MenuWidth-4, ms.stripColors(line))
+		// 使用plainLine计算长度，但显示带颜色的line
+		padding := MenuWidth - 4 - len(plainLine)
+		if padding < 0 {
+			padding = 0
+		}
+		fmt.Printf(ColorCyan + "|" + ColorReset + "%s%s" + ColorCyan + "|\n" + ColorReset, line, strings.Repeat(" ", padding))
 
 		// 描述信息
 		if item.Description != "" {
 			desc := fmt.Sprintf("    %s", item.Description)
-			fmt.Printf(ColorCyan + "║" + ColorDim + " %-*s " + ColorReset + ColorCyan + "║\n" + ColorReset, MenuWidth-4, desc)
+			fmt.Printf(ColorCyan + "|" + ColorDim + " %-*s " + ColorReset + ColorCyan + "|\n" + ColorReset, MenuWidth-4, desc)
 		}
 
-		fmt.Printf(ColorCyan + "║%-*s║\n" + ColorReset, MenuWidth-2, "")
+		fmt.Printf(ColorCyan + "|%-*s|\n" + ColorReset, MenuWidth-2, "")
 	}
 
 	// 返回选项
 	if ms.currentMenu.Parent != nil {
 		returnText := fmt.Sprintf(" %s0%s. %s返回上级菜单%s", ColorGreen, ColorReset, ColorBold, ColorReset)
-		fmt.Printf(ColorCyan + "║" + ColorReset + " %-*s " + ColorCyan + "║\n" + ColorReset, MenuWidth-4, ms.stripColors(returnText))
-		fmt.Printf(ColorCyan + "║%-*s║\n" + ColorReset, MenuWidth-2, "")
+		returnPlain := " 0. 返回上级菜单"
+		padding := MenuWidth - 4 - len(returnPlain)
+		if padding < 0 {
+			padding = 0
+		}
+		fmt.Printf(ColorCyan + "|" + ColorReset + "%s%s" + ColorCyan + "|\n" + ColorReset, returnText, strings.Repeat(" ", padding))
+		fmt.Printf(ColorCyan + "|%-*s|\n" + ColorReset, MenuWidth-2, "")
 	}
 
 	// 退出选项
 	exitText := fmt.Sprintf(" %sq%s. %s退出程序%s", ColorRed, ColorReset, ColorBold, ColorReset)
-	fmt.Printf(ColorCyan + "║" + ColorReset + " %-*s " + ColorCyan + "║\n" + ColorReset, MenuWidth-4, ms.stripColors(exitText))
+	exitPlain := " q. 退出程序"
+	padding := MenuWidth - 4 - len(exitPlain)
+	if padding < 0 {
+		padding = 0
+	}
+	fmt.Printf(ColorCyan + "|" + ColorReset + "%s%s" + ColorCyan + "|\n" + ColorReset, exitText, strings.Repeat(" ", padding))
 }
 
 // displayFooter 显示底部信息
 func (ms *MenuSystem) displayFooter() {
-	fmt.Println(ColorCyan + "╚" + strings.Repeat("═", MenuWidth-2) + "╝" + ColorReset)
+	fmt.Println(ColorCyan + "+" + strings.Repeat("-", MenuWidth-2) + "+" + ColorReset)
 	fmt.Print(ColorBold + "请选择操作 (输入数字或字母): " + ColorReset)
 }
 
