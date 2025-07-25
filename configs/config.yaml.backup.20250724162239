@@ -1,0 +1,103 @@
+app:
+    auto_backup: true
+    backup_count: 5
+    check_updates: true
+    config_dir: ./configs
+    data_dir: ./data
+    first_run: true
+    language: en_US
+    max_instances: 10
+    theme: default
+backup:
+    auto_backup: false
+    backup_dir: ./data/backups
+    backup_interval: 24h
+    compress_backups: true
+    enabled: true
+    exclude_patterns:
+        - '*.log'
+        - '*.tmp'
+        - cache/*
+    include_logs: false
+    include_plugins: true
+    include_worlds: true
+    max_backups: 10
+daemon:
+    auto_start: false
+    enabled: false
+    group: ""
+    restart_policy: always
+    service_name: easilypanel
+    user: ""
+download:
+    auto_cleanup: false
+    cleanup_days: 30
+    default_source: fastmirror
+    max_concurrent: 3
+    retry: 3
+    sources:
+        fastmirror: https://download.fastmirror.net/api/v3
+        mcsl: https://sync.mcsl.com.cn/api
+    timeout: 300
+    verify_checksum: true
+frp:
+    auto_config: true
+    enabled: false
+ftp:
+    enabled: false
+    port: 21
+    root_dir: ./data
+    user: admin
+instance:
+    auto_eula: false
+    auto_restart: false
+    default_java_args:
+        - -Xmx2G
+        - -Xms1G
+        - -XX:+UseG1GC
+        - -XX:+ParallelRefProcEnabled
+        - -XX:MaxGCPauseMillis=200
+        - -XX:+UnlockExperimentalVMOptions
+        - -XX:+DisableExplicitGC
+        - -XX:+AlwaysPreTouch
+        - -XX:G1NewSizePercent=30
+        - -XX:G1MaxNewSizePercent=40
+        - -XX:G1HeapRegionSize=8M
+        - -XX:G1ReservePercent=20
+        - -XX:G1HeapWastePercent=5
+        - -XX:G1MixedGCCountTarget=4
+        - -XX:InitiatingHeapOccupancyPercent=15
+        - -XX:G1MixedGCLiveThresholdPercent=90
+        - -XX:G1RSetUpdatingPauseTimePercent=5
+        - -XX:SurvivorRatio=32
+        - -XX:+PerfDisableSharedMem
+        - -XX:MaxTenuringThreshold=1
+    default_memory:
+        max: 2G
+        min: 1G
+    default_server_args:
+        - nogui
+    log_retention: 7
+    max_restarts: 3
+    restart_delay: 5
+    templates: {}
+java:
+    auto_detect: true
+    exclude_paths: []
+    search_paths: []
+log:
+    compress: true
+    file: ./logs/easilypanel.log
+    level: info
+    max_age: 28
+    max_backups: 3
+    max_size: 100
+network:
+    proxy_enabled: false
+    proxy_host: ""
+    proxy_pass: ""
+    proxy_port: 8080
+    proxy_type: http
+    proxy_user: ""
+    timeout: 30
+    user_agent: EasilyPanel5/1.0.0
