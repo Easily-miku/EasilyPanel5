@@ -221,7 +221,8 @@ EasilyPanel5/
 - [Viper](https://github.com/spf13/viper) - 配置管理
 - [Logrus](https://github.com/sirupsen/logrus) - 日志系统
 - [OpenFRP](https://openfrp.net/) - 内网穿透服务
-
+- [FastMirror](https://fastmirror.net/) - 我的世界服务器核心镜像站
+- 
 ## 🔧 配置说明
 
 ### 配置文件位置
@@ -325,14 +326,14 @@ sudo xattr -rd com.apple.quarantine easilypanel-macos-amd64
 
 ## 📞 支持
 
-- 🐛 [报告Bug](https://github.com/yourusername/EasilyPanel5/issues)
-- 💡 [功能建议](https://github.com/yourusername/EasilyPanel5/issues)
-- 📖 [Wiki文档](https://github.com/yourusername/EasilyPanel5/wiki)
-- 💬 [讨论区](https://github.com/yourusername/EasilyPanel5/discussions)
+- 🐛 [报告Bug](https://github.com/Easily-miku/EasilyPanel5/issues)
+- 💡 [功能建议](https://github.com/Easily-miku/EasilyPanel5/issues)
+- 📖 [Wiki文档](https://github.com/Easily-miku/EasilyPanel5/wiki)
+- 💬 [讨论区](https://github.com/Easily-miku/EasilyPanel5/discussions)
 
 ## 🌟 Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=yourusername/EasilyPanel5&type=Date)](https://star-history.com/#yourusername/EasilyPanel5&Date)
+[![Star History Chart](https://api.star-history.com/svg?repos=Easily-miku/EasilyPanel5&type=Date)](https://star-history.com/#Easily-miku/EasilyPanel5&Date)
 
 ---
 
@@ -340,6 +341,6 @@ sudo xattr -rd com.apple.quarantine easilypanel-macos-amd64
 
 **⭐ 如果这个项目对你有帮助，请给我们一个星标！**
 
-Made with ❤️ by EasilyPanel Team
+Made with ❤️ by EasilyPanel Team - 轻易
 
 </div>
