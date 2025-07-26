@@ -70,6 +70,7 @@ frp:
         auto_login: false
         auto_update: true
         preferred_node: 0
+        user_token: 09d9c59a86756a1e049dba20f8a66d7d
     server_addr: ""
     token: ""
 ftp:

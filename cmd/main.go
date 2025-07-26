@@ -11,6 +11,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/manifoldco/promptui"
+
 	"easilypanel/internal/config"
 	"easilypanel/internal/download"
 	"easilypanel/internal/frp"
@@ -332,9 +334,7 @@ func createSettingsMenu() *menu.Menu {
 	
 	settingsMenu.AddItems(
 		menu.NewMenuItem("config", "配置管理", "查看和修改系统配置").
-			WithHandler(func() error {
-				return handleConfigManagement()
-			}),
+			WithSubMenu(createConfigMenu()),
 
 		menu.NewMenuItem("backup", "备份管理", "创建和恢复系统备份").
 			WithHandler(func() error {
@@ -376,20 +376,23 @@ func handleCreateInstance() error {
 	}
 
 	// 选择服务端类型
-	fmt.Println("\n可用的服务端类型:")
-	fmt.Println("1. Minecraft Java版")
-	fmt.Println("2. Minecraft 基岩版")
-	fmt.Print("请选择服务端类型 (1-2): ")
+	serverTypes := []string{"Minecraft Java版", "Minecraft 基岩版"}
 
-	if !scanner.Scan() {
-		return fmt.Errorf("读取输入失败")
+	prompt := promptui.Select{
+		Label: "请选择服务端类型",
+		Items: serverTypes,
+	}
+
+	index, _, err := prompt.Run()
+	if err != nil {
+		return fmt.Errorf("选择服务端类型失败: %w", err)
 	}
 
 	var serverType string
-	switch strings.TrimSpace(scanner.Text()) {
-	case "1":
+	switch index {
+	case 0:
 		serverType = "minecraft"
-	case "2":
+	case 1:
 		serverType = "bedrock"
 	default:
 		return fmt.Errorf("无效的服务端类型")
@@ -504,47 +507,53 @@ func handleManageInstance() error {
 
 	// 显示管理选项
 	fmt.Printf("\n管理实例: %s\n", selectedInstance.Name)
-	fmt.Println("1. 启动实例")
-	fmt.Println("2. 停止实例")
-	fmt.Println("3. 重启实例")
-	fmt.Println("4. 删除实例")
-	fmt.Println("5. 查看配置")
-	fmt.Println("6. 编辑配置")
-	fmt.Println("7. 查看日志")
-	fmt.Print("请选择操作 (1-7): ")
 
-	if !scanner.Scan() {
-		return fmt.Errorf("读取输入失败")
+	actions := []string{
+		"启动实例",
+		"停止实例",
+		"重启实例",
+		"删除实例",
+		"查看配置",
+		"编辑配置",
+		"查看日志",
 	}
 
-	action := strings.TrimSpace(scanner.Text())
+	prompt := promptui.Select{
+		Label: "请选择操作",
+		Items: actions,
+	}
+
+	actionIndex, _, err := prompt.Run()
+	if err != nil {
+		return fmt.Errorf("选择操作失败: %w", err)
+	}
 
 	// 创建进程管理器
 	processManager := instance.NewProcessManager("./data/instances")
 
-	switch action {
-	case "1":
+	switch actionIndex {
+	case 0:
 		fmt.Printf("正在启动实例 '%s'...\n", selectedInstance.Name)
 		if err := processManager.StartInstance(selectedInstance.Name); err != nil {
 			return fmt.Errorf("启动实例失败: %w", err)
 		}
 		fmt.Println("✓ 实例启动成功")
 
-	case "2":
+	case 1:
 		fmt.Printf("正在停止实例 '%s'...\n", selectedInstance.Name)
 		if err := processManager.StopInstance(selectedInstance.Name); err != nil {
 			return fmt.Errorf("停止实例失败: %w", err)
 		}
 		fmt.Println("✓ 实例停止成功")
 
-	case "3":
+	case 2:
 		fmt.Printf("正在重启实例 '%s'...\n", selectedInstance.Name)
 		if err := processManager.RestartInstance(selectedInstance.Name); err != nil {
 			return fmt.Errorf("重启实例失败: %w", err)
 		}
 		fmt.Println("✓ 实例重启成功")
 
-	case "4":
+	case 3:
 		fmt.Printf("确定要删除实例 '%s' 吗? (y/N): ", selectedInstance.Name)
 		if !scanner.Scan() {
 			return fmt.Errorf("读取输入失败")
@@ -560,7 +569,7 @@ func handleManageInstance() error {
 			fmt.Println("取消删除")
 		}
 
-	case "5":
+	case 4:
 		fmt.Printf("\n实例配置: %s\n", selectedInstance.Name)
 		fmt.Printf("类型: %s\n", selectedInstance.Type)
 		fmt.Printf("端口: %d\n", selectedInstance.Port)
@@ -580,10 +589,10 @@ func handleManageInstance() error {
 			fmt.Printf("最后启动: %s\n", selectedInstance.LastStarted.Format("2006-01-02 15:04:05"))
 		}
 
-	case "6":
+	case 5:
 		return handleEditInstanceConfig(manager, selectedInstance, scanner)
 
-	case "7":
+	case 6:
 		return handleViewInstanceLogs(selectedInstance)
 
 	default:
@@ -880,39 +889,43 @@ func handleCleanupDownloads() error {
 	}
 
 	fmt.Printf("找到 %d 个文件，总大小: %s\n", fileCount, totalSizeStr)
-	fmt.Println("\n清理选项:")
-	fmt.Println("1. 清理所有下载文件")
-	fmt.Println("2. 清理7天前的文件")
-	fmt.Println("3. 清理30天前的文件")
-	fmt.Println("4. 取消清理")
 
-	scanner := bufio.NewScanner(os.Stdin)
-	fmt.Print("请选择清理方式 (1-4): ")
-	if !scanner.Scan() {
-		return fmt.Errorf("读取输入失败")
+	cleanupOptions := []string{
+		"清理所有下载文件",
+		"清理7天前的文件",
+		"清理30天前的文件",
+		"取消清理",
 	}
 
-	choice := strings.TrimSpace(scanner.Text())
+	prompt := promptui.Select{
+		Label: "请选择清理方式",
+		Items: cleanupOptions,
+	}
 
-	switch choice {
-	case "1":
-		fmt.Print("确定要删除所有下载文件吗? (y/N): ")
-		if !scanner.Scan() {
-			return fmt.Errorf("读取输入失败")
+	cleanupIndex, _, err := prompt.Run()
+	if err != nil {
+		return fmt.Errorf("选择清理方式失败: %w", err)
+	}
+
+	switch cleanupIndex {
+	case 0:
+		confirmPrompt := promptui.Prompt{
+			Label:     "确定要删除所有下载文件吗",
+			IsConfirm: true,
 		}
-		confirm := strings.ToLower(strings.TrimSpace(scanner.Text()))
-		if confirm == "y" || confirm == "yes" {
+		_, err := confirmPrompt.Run()
+		if err == nil {
 			return cleanupFiles(downloadDir, 0)
 		}
 		fmt.Println("取消清理")
 
-	case "2":
+	case 1:
 		return cleanupFiles(downloadDir, 7)
 
-	case "3":
+	case 2:
 		return cleanupFiles(downloadDir, 30)
 
-	case "4":
+	case 3:
 		fmt.Println("取消清理")
 
 	default:
@@ -1203,15 +1216,16 @@ func handleFRPClient() error {
 		fmt.Println("\nfrpc客户端管理:")
 		fmt.Printf("当前状态: %s\n", manager.GetFRPCStatus())
 		fmt.Println("\n操作选项:")
-		fmt.Println("1. 启动frpc")
-		fmt.Println("2. 停止frpc")
-		fmt.Println("3. 重启frpc")
-		fmt.Println("4. 查看日志")
-		fmt.Println("5. 清空日志")
-		fmt.Println("6. 查看配置")
-		fmt.Println("7. 重新生成配置")
+		fmt.Println("1. 启动frpc (配置文件方式)")
+		fmt.Println("2. 启动frpc (命令行方式)")
+		fmt.Println("3. 停止frpc")
+		fmt.Println("4. 重启frpc")
+		fmt.Println("5. 查看日志")
+		fmt.Println("6. 清空日志")
+		fmt.Println("7. 查看配置")
+		fmt.Println("8. 重新生成配置")
 		fmt.Println("0. 返回上级菜单")
-		fmt.Print("请选择操作 (0-7): ")
+		fmt.Print("请选择操作 (0-8): ")
 
 		if !scanner.Scan() {
 			return fmt.Errorf("读取输入失败")
@@ -1221,7 +1235,7 @@ func handleFRPClient() error {
 
 		switch choice {
 		case "1":
-			fmt.Println("正在启动frpc...")
+			fmt.Println("正在启动frpc (配置文件方式)...")
 			if err := manager.StartFRPC(); err != nil {
 				fmt.Printf("启动失败: %v\n", err)
 			} else {
@@ -1229,6 +1243,11 @@ func handleFRPClient() error {
 			}
 
 		case "2":
+			if err := handleStartFRPCWithCommand(manager, scanner); err != nil {
+				fmt.Printf("启动失败: %v\n", err)
+			}
+
+		case "3":
 			fmt.Println("正在停止frpc...")
 			if err := manager.StopFRPC(); err != nil {
 				fmt.Printf("停止失败: %v\n", err)
@@ -1236,7 +1255,7 @@ func handleFRPClient() error {
 				fmt.Println("✓ frpc停止成功")
 			}
 
-		case "3":
+		case "4":
 			fmt.Println("正在重启frpc...")
 			if err := manager.RestartFRPC(); err != nil {
 				fmt.Printf("重启失败: %v\n", err)
@@ -1244,12 +1263,12 @@ func handleFRPClient() error {
 				fmt.Println("✓ frpc重启成功")
 			}
 
-		case "4":
+		case "5":
 			if err := handleViewFRPCLogs(manager); err != nil {
 				fmt.Printf("查看日志失败: %v\n", err)
 			}
 
-		case "5":
+		case "6":
 			fmt.Print("确定要清空frpc日志吗? (y/N): ")
 			if !scanner.Scan() {
 				return fmt.Errorf("读取输入失败")
@@ -1263,12 +1282,12 @@ func handleFRPClient() error {
 				}
 			}
 
-		case "6":
+		case "7":
 			if err := handleViewFRPCConfig(manager); err != nil {
 				fmt.Printf("查看配置失败: %v\n", err)
 			}
 
-		case "7":
+		case "8":
 			fmt.Print("确定要重新生成frpc配置吗? (y/N): ")
 			if !scanner.Scan() {
 				return fmt.Errorf("读取输入失败")
@@ -1299,6 +1318,113 @@ func handleFRPClient() error {
 		fmt.Print("\n按回车键继续...")
 		scanner.Scan()
 	}
+}
+
+// handleStartFRPCWithCommand 使用命令行方式启动frpc
+func handleStartFRPCWithCommand(manager *frp.Manager, scanner *bufio.Scanner) error {
+	fmt.Println("正在启动frpc (命令行方式)...")
+
+	// 获取用户访问密钥
+	userToken := config.GetString("frp.openfrp.user_token")
+	if userToken == "" {
+		fmt.Print("请输入用户访问密钥: ")
+		if !scanner.Scan() {
+			return fmt.Errorf("读取输入失败")
+		}
+		userToken = strings.TrimSpace(scanner.Text())
+		if userToken == "" {
+			return fmt.Errorf("用户访问密钥不能为空")
+		}
+
+		// 保存到配置
+		config.Set("frp.openfrp.user_token", userToken)
+		if err := config.SaveConfig(); err != nil {
+			fmt.Printf("警告: 保存配置失败: %v\n", err)
+		}
+	}
+
+	// 设置认证令牌以获取隧道列表
+	authToken := config.GetString("frp.openfrp.authorization")
+	if authToken == "" {
+		return fmt.Errorf("未设置认证令牌，请先在设置中配置")
+	}
+
+	manager.SetAuthorization(authToken)
+
+	// 获取隧道列表
+	fmt.Println("正在获取隧道列表...")
+	proxies, err := manager.GetProxies()
+	if err != nil {
+		return fmt.Errorf("获取隧道列表失败: %w", err)
+	}
+
+	if len(proxies) == 0 {
+		return fmt.Errorf("没有可用的隧道")
+	}
+
+	// 显示隧道列表供用户选择
+	fmt.Println("\n可用隧道列表:")
+	var enabledProxies []frp.ProxyInfo
+	for _, proxy := range proxies {
+		if proxy.Status {
+			fmt.Printf("%d. %s (ID: %d) - %s:%d -> %s\n",
+				len(enabledProxies)+1, proxy.ProxyName, proxy.ID,
+				proxy.ProxyType, proxy.LocalPort, proxy.FriendlyNode)
+			enabledProxies = append(enabledProxies, proxy)
+		}
+	}
+
+	if len(enabledProxies) == 0 {
+		return fmt.Errorf("没有启用的隧道")
+	}
+
+	fmt.Print("\n请输入要启动的隧道编号 (多个用逗号分隔，回车启动全部): ")
+	if !scanner.Scan() {
+		return fmt.Errorf("读取输入失败")
+	}
+
+	selection := strings.TrimSpace(scanner.Text())
+	var selectedProxyIDs []string
+
+	if selection == "" {
+		// 启动全部隧道
+		for _, proxy := range enabledProxies {
+			selectedProxyIDs = append(selectedProxyIDs, fmt.Sprintf("%d", proxy.ID))
+		}
+	} else {
+		// 解析用户选择
+		selections := strings.Split(selection, ",")
+		for _, sel := range selections {
+			sel = strings.TrimSpace(sel)
+			if sel == "" {
+				continue
+			}
+
+			// 转换为数字索引
+			index := 0
+			if _, err := fmt.Sscanf(sel, "%d", &index); err != nil {
+				return fmt.Errorf("无效的隧道编号: %s", sel)
+			}
+
+			if index < 1 || index > len(enabledProxies) {
+				return fmt.Errorf("隧道编号超出范围: %d", index)
+			}
+
+			selectedProxyIDs = append(selectedProxyIDs, fmt.Sprintf("%d", enabledProxies[index-1].ID))
+		}
+	}
+
+	if len(selectedProxyIDs) == 0 {
+		return fmt.Errorf("没有选择任何隧道")
+	}
+
+	// 启动frpc
+	if err := manager.StartFRPCWithCommand(userToken, selectedProxyIDs); err != nil {
+		return err
+	}
+
+	fmt.Printf("✓ frpc启动成功，已启动 %d 个隧道\n", len(selectedProxyIDs))
+	return nil
 }
 
 func handleFRPStatus() error {
@@ -1474,9 +1600,10 @@ func handleEditFRPConfig(scanner *bufio.Scanner) error {
 	fmt.Println("\n=== 修改OpenFRP配置 ===")
 
 	fmt.Println("1. 修改认证令牌")
-	fmt.Println("2. 修改API地址")
-	fmt.Println("3. 修改默认节点")
-	fmt.Print("请选择要修改的配置 (1-3): ")
+	fmt.Println("2. 修改用户访问密钥")
+	fmt.Println("3. 修改API地址")
+	fmt.Println("4. 修改默认节点")
+	fmt.Print("请选择要修改的配置 (1-4): ")
 
 	if !scanner.Scan() {
 		return fmt.Errorf("读取输入失败")
@@ -1500,6 +1627,21 @@ func handleEditFRPConfig(scanner *bufio.Scanner) error {
 		}
 
 	case "2":
+		fmt.Printf("当前用户访问密钥: %s\n", config.GetString("frp.openfrp.user_token"))
+		fmt.Print("请输入新的用户访问密钥: ")
+		if !scanner.Scan() {
+			return fmt.Errorf("读取输入失败")
+		}
+		newUserToken := strings.TrimSpace(scanner.Text())
+		if newUserToken != "" {
+			config.Set("frp.openfrp.user_token", newUserToken)
+			if err := config.SaveConfig(); err != nil {
+				return err
+			}
+			fmt.Println("✓ 用户访问密钥已更新")
+		}
+
+	case "3":
 		fmt.Printf("当前API地址: %s\n", config.GetString("frp.openfrp.api_url"))
 		fmt.Print("请输入新的API地址: ")
 		if !scanner.Scan() {
@@ -1514,7 +1656,7 @@ func handleEditFRPConfig(scanner *bufio.Scanner) error {
 			fmt.Println("✓ API地址已更新")
 		}
 
-	case "3":
+	case "4":
 		fmt.Printf("当前默认节点: %d\n", config.GetInt("frp.openfrp.default_node_id"))
 		fmt.Print("请输入新的默认节点ID: ")
 		if !scanner.Scan() {
@@ -1685,78 +1827,64 @@ func handleImportConfig(scanner *bufio.Scanner) error {
 	return nil
 }
 
-func handleConfigManagement() error {
-	fmt.Println("=== 配置管理 ===")
+// createConfigMenu 创建配置管理子菜单
+func createConfigMenu() *menu.Menu {
+	configMenu := menu.NewMenu("配置管理", "查看和修改系统配置")
 
-	scanner := bufio.NewScanner(os.Stdin)
+	configMenu.AddItems(
+		menu.NewMenuItem("view", "查看当前配置", "显示当前系统配置").
+			WithHandler(func() error {
+				return handleViewConfig()
+			}),
 
-	for {
-		fmt.Println("\n配置管理选项:")
-		fmt.Println("1. 查看当前配置")
-		fmt.Println("2. 修改OpenFRP配置")
-		fmt.Println("3. 修改系统配置")
-		fmt.Println("4. 重置配置")
-		fmt.Println("5. 导出配置")
-		fmt.Println("6. 导入配置")
-		fmt.Println("0. 返回上级菜单")
-		fmt.Print("请选择操作 (0-6): ")
+		menu.NewMenuItem("frp", "修改OpenFRP配置", "修改OpenFRP相关配置").
+			WithHandler(func() error {
+				scanner := bufio.NewScanner(os.Stdin)
+				return handleEditFRPConfig(scanner)
+			}),
 
-		if !scanner.Scan() {
-			return fmt.Errorf("读取输入失败")
-		}
+		menu.NewMenuItem("system", "修改系统配置", "修改系统相关配置").
+			WithHandler(func() error {
+				scanner := bufio.NewScanner(os.Stdin)
+				return handleEditSystemConfig(scanner)
+			}),
 
-		choice := strings.TrimSpace(scanner.Text())
-
-		switch choice {
-		case "1":
-			if err := handleViewConfig(); err != nil {
-				fmt.Printf("查看配置失败: %v\n", err)
-			}
-
-		case "2":
-			if err := handleEditFRPConfig(scanner); err != nil {
-				fmt.Printf("修改OpenFRP配置失败: %v\n", err)
-			}
-
-		case "3":
-			if err := handleEditSystemConfig(scanner); err != nil {
-				fmt.Printf("修改系统配置失败: %v\n", err)
-			}
-
-		case "4":
-			fmt.Print("确定要重置所有配置吗? 这将删除所有自定义设置 (y/N): ")
-			if !scanner.Scan() {
-				return fmt.Errorf("读取输入失败")
-			}
-			confirm := strings.ToLower(strings.TrimSpace(scanner.Text()))
-			if confirm == "y" || confirm == "yes" {
-				if err := handleResetConfig(); err != nil {
-					fmt.Printf("重置配置失败: %v\n", err)
-				} else {
+		menu.NewMenuItem("reset", "重置配置", "重置所有配置到默认值").
+			WithHandler(func() error {
+				confirmPrompt := promptui.Prompt{
+					Label:     "确定要重置所有配置吗? 这将删除所有自定义设置",
+					IsConfirm: true,
+				}
+				_, err := confirmPrompt.Run()
+				if err == nil {
+					if err := handleResetConfig(); err != nil {
+						return fmt.Errorf("重置配置失败: %w", err)
+					}
 					fmt.Println("✓ 配置已重置")
 				}
-			}
+				return nil
+			}),
 
-		case "5":
-			if err := handleExportConfig(scanner); err != nil {
-				fmt.Printf("导出配置失败: %v\n", err)
-			}
+		menu.NewMenuItem("export", "导出配置", "导出当前配置到文件").
+			WithHandler(func() error {
+				scanner := bufio.NewScanner(os.Stdin)
+				return handleExportConfig(scanner)
+			}),
 
-		case "6":
-			if err := handleImportConfig(scanner); err != nil {
-				fmt.Printf("导入配置失败: %v\n", err)
-			}
+		menu.NewMenuItem("import", "导入配置", "从文件导入配置").
+			WithHandler(func() error {
+				scanner := bufio.NewScanner(os.Stdin)
+				return handleImportConfig(scanner)
+			}),
+	)
 
-		case "0":
-			return nil
+	return configMenu
+}
 
-		default:
-			fmt.Println("无效选择")
-		}
-
-		fmt.Print("\n按回车键继续...")
-		scanner.Scan()
-	}
+func handleConfigManagement() error {
+	// 这个函数现在只是为了兼容性，实际应该使用createConfigMenu
+	fmt.Println("配置管理功能请通过主菜单 -> 系统设置 -> 配置管理 访问")
+	return nil
 }
 
 func handleAbout() error {

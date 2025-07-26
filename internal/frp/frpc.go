@@ -275,55 +275,112 @@ func (m *FRPCManager) GetVersion() (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
-// Start 启动frpc
+// Start 启动frpc（使用配置文件方式）
 func (m *FRPCManager) Start() error {
 	if m.IsRunning() {
 		return fmt.Errorf("frpc已在运行")
 	}
-	
+
 	if !m.IsInstalled() {
 		return fmt.Errorf("frpc未安装")
 	}
-	
+
 	// 检查配置文件
 	if _, err := os.Stat(m.configPath); os.IsNotExist(err) {
 		return fmt.Errorf("配置文件不存在: %s", m.configPath)
 	}
-	
+
 	// 创建日志目录
 	logDir := filepath.Dir(m.logPath)
 	if err := os.MkdirAll(logDir, 0755); err != nil {
 		return fmt.Errorf("创建日志目录失败: %w", err)
 	}
-	
+
 	// 启动frpc
 	cmd := exec.Command(m.binaryPath, "-c", m.configPath)
-	
+
 	// 设置日志输出
 	logFile, err := os.OpenFile(m.logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
 	if err != nil {
 		return fmt.Errorf("打开日志文件失败: %w", err)
 	}
-	
+
 	cmd.Stdout = logFile
 	cmd.Stderr = logFile
-	
+
 	// 启动进程
 	if err := cmd.Start(); err != nil {
 		logFile.Close()
 		return fmt.Errorf("启动frpc失败: %w", err)
 	}
-	
+
 	m.process = cmd.Process
-	
+
 	// 在后台等待进程结束
 	go func() {
 		cmd.Wait()
 		logFile.Close()
 		m.process = nil
 	}()
-	
+
 	fmt.Printf("✓ frpc已启动 (PID: %d)\n", m.process.Pid)
+	return nil
+}
+
+// StartWithCommand 使用命令行方式启动frpc
+func (m *FRPCManager) StartWithCommand(userToken string, proxyIDs []string) error {
+	if m.IsRunning() {
+		return fmt.Errorf("frpc已在运行")
+	}
+
+	if !m.IsInstalled() {
+		return fmt.Errorf("frpc未安装")
+	}
+
+	if userToken == "" {
+		return fmt.Errorf("用户访问密钥不能为空")
+	}
+
+	if len(proxyIDs) == 0 {
+		return fmt.Errorf("隧道ID列表不能为空")
+	}
+
+	// 创建日志目录
+	logDir := filepath.Dir(m.logPath)
+	if err := os.MkdirAll(logDir, 0755); err != nil {
+		return fmt.Errorf("创建日志目录失败: %w", err)
+	}
+
+	// 构建命令参数：frpc -u 用户访问密钥 -p 隧道ID1,隧道ID2
+	proxyIDsStr := strings.Join(proxyIDs, ",")
+	cmd := exec.Command(m.binaryPath, "-u", userToken, "-p", proxyIDsStr)
+
+	// 设置日志输出
+	logFile, err := os.OpenFile(m.logPath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0644)
+	if err != nil {
+		return fmt.Errorf("打开日志文件失败: %w", err)
+	}
+
+	cmd.Stdout = logFile
+	cmd.Stderr = logFile
+
+	// 启动进程
+	if err := cmd.Start(); err != nil {
+		logFile.Close()
+		return fmt.Errorf("启动frpc失败: %w", err)
+	}
+
+	m.process = cmd.Process
+
+	// 在后台等待进程结束
+	go func() {
+		cmd.Wait()
+		logFile.Close()
+		m.process = nil
+	}()
+
+	fmt.Printf("✓ frpc已启动 (PID: %d)\n", m.process.Pid)
+	fmt.Printf("启动参数: -u %s -p %s\n", userToken, proxyIDsStr)
 	return nil
 }
 

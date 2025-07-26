@@ -1,8 +1,0 @@
-{
-    "java": [
-        {
-            "path": "/usr/lib/JDK21/bin/java",
-            "version": "21.0.7.0"
-        }
-    ]
-}

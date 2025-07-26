@@ -176,9 +176,14 @@ func (m *Manager) GenerateConfig(serverAddr, token string) error {
 	return m.frpc.GenerateConfig(serverAddr, token, enabledProxies)
 }
 
-// StartFRPC 启动frpc
+// StartFRPC 启动frpc（使用配置文件方式）
 func (m *Manager) StartFRPC() error {
 	return m.frpc.Start()
+}
+
+// StartFRPCWithCommand 使用命令行方式启动frpc
+func (m *Manager) StartFRPCWithCommand(userToken string, proxyIDs []string) error {
+	return m.frpc.StartWithCommand(userToken, proxyIDs)
 }
 
 // StopFRPC 停止frpc

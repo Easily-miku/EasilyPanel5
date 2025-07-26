@@ -193,9 +193,11 @@ func (c *OpenFRPClient) getProxiesWithToken() (*ProxyListResponse, error) {
 
 // GetNodes 获取节点列表
 func (c *OpenFRPClient) GetNodes() (*NodeListResponse, error) {
+	// 首先尝试标准API
 	resp, err := c.makeRequest("POST", "/frp/api/getNodeList", nil)
 	if err != nil {
-		return nil, fmt.Errorf("获取节点列表失败: %w", err)
+		// 如果失败，尝试使用GET方式获取节点列表
+		return c.getNodesWithGET()
 	}
 
 	var nodeList NodeListResponse
@@ -204,6 +206,57 @@ func (c *OpenFRPClient) GetNodes() (*NodeListResponse, error) {
 	}
 
 	return &nodeList, nil
+}
+
+// getNodesWithGET 使用GET方式获取节点列表（备用方法）
+func (c *OpenFRPClient) getNodesWithGET() (*NodeListResponse, error) {
+	// 构建URL
+	url := fmt.Sprintf("%s/api?action=getnodelist", c.baseURL)
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return nil, fmt.Errorf("创建请求失败: %w", err)
+	}
+
+	req.Header.Set("User-Agent", c.userAgent)
+	if c.authorization != "" {
+		req.Header.Set("Authorization", c.authorization)
+	}
+
+	resp, err := c.httpClient.Do(req)
+	if err != nil {
+		return nil, fmt.Errorf("请求失败: %w", err)
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return nil, fmt.Errorf("HTTP错误: %d %s", resp.StatusCode, resp.Status)
+	}
+
+	respBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		return nil, fmt.Errorf("读取响应失败: %w", err)
+	}
+
+	// 尝试解析为标准API响应格式
+	var apiResp APIResponse
+	if err := json.Unmarshal(respBody, &apiResp); err == nil && apiResp.Flag {
+		var nodeList NodeListResponse
+		if err := mapToStruct(apiResp.Data, &nodeList); err != nil {
+			return nil, fmt.Errorf("解析节点列表失败: %w", err)
+		}
+		return &nodeList, nil
+	}
+
+	// 如果不是标准格式，尝试直接解析为节点数组
+	var nodes []NodeInfo
+	if err := json.Unmarshal(respBody, &nodes); err != nil {
+		return nil, fmt.Errorf("解析节点列表失败: %w", err)
+	}
+
+	return &NodeListResponse{
+		List: nodes,
+	}, nil
 }
 
 // CreateProxy 创建新隧道
