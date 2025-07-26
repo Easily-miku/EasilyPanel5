@@ -1,0 +1,103 @@
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool, specifically when used with LiteIDE
+*.out
+
+# Dependency directories (remove the comment below to include it)
+# vendor/
+
+# Go workspace file
+go.work
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS generated files
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# Build output
+build/
+dist/
+release/
+
+# Compiled binaries
+easilypanel
+easilypanel-*
+!easilypanel-*.md
+
+# Data directories (keep structure but ignore content)
+data/instances/*/
+data/downloads/*.jar
+data/downloads/*.zip
+data/downloads/*.tar.gz
+data/logs/*.log
+data/bin/frpc*
+data/configs/*.ini
+
+# Config files with sensitive data
+configs/config.yaml
+!configs/config.yaml.example
+
+# Backup files
+*.backup
+*.bak
+config_backup.yaml
+
+# Temporary files
+*.tmp
+*.temp
+test-*
+temp-*
+
+# Log files
+*.log
+logs/
+
+# Python cache (if any Python scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Node modules (if any JS tools)
+node_modules/
+
+# Coverage reports
+coverage.txt
+coverage.html
+
+# Profiling data
+*.prof
+*.pprof
+
+# Local development files
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+
+# Documentation build
+docs/_build/
+docs/site/
+
+# Test data
+testdata/output/
+testdata/temp/
