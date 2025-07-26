@@ -66,11 +66,11 @@ frp:
     enabled: false
     openfrp:
         api_base_url: https://api.openfrp.net
-        authorization: 3165dd269d1843ba9960839238478d49YZQ0MZDHNTCTNJDMNC0ZNJE3
+        authorization: 
         auto_login: false
         auto_update: true
         preferred_node: 0
-        user_token: 09d9c59a86756a1e049dba20f8a66d7d
+        user_token: 
     server_addr: ""
     token: ""
 ftp:
